@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: attorney-matchmaker
+    runtime: python
+    region: oregon
+    plan: free
+
+    # Build: install Node, build the React frontend, then install Python deps
+    buildCommand: |
+      cd frontend && npm ci && npm run build && cd ../backend && pip install -r requirements.txt
+
+    # Start: run from the backend directory
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+
+    # Health check
+    healthCheckPath: /api/health
+
+    # Environment variables — set values in Render dashboard (never commit secrets)
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DEBUG
+        value: "false"
+      - key: PORT
+        generateValue: false
+      # --- Set these in the Render dashboard ---
+      # GEMINI_API_KEY
+      # ANTHROPIC_API_KEY
+      # COURTLISTENER_API_TOKEN
+      # CORS_ORIGINS (set to your Render URL after first deploy, e.g. https://attorney-matchmaker.onrender.com)

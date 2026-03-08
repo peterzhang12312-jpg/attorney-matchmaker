@@ -1,0 +1,132 @@
+/* ------------------------------------------------------------------ */
+/*  API client — thin fetch wrappers for every backend endpoint        */
+/*  All paths are relative so Vite's dev proxy handles routing.        */
+/* ------------------------------------------------------------------ */
+
+import type {
+  HealthResponse,
+  IntakeRequest,
+  IntakeResponse,
+  MatchRequest,
+  MatchResponse,
+  AttorneyListResponse,
+  RefineFactsRequest,
+  RefineFactsResponse,
+  LeaderboardResponse,
+} from "../types/api";
+
+class ApiError extends Error {
+  constructor(
+    public status: number,
+    public body: string,
+  ) {
+    super(`API ${status}: ${body}`);
+    this.name = "ApiError";
+  }
+}
+
+async function request<T>(
+  url: string,
+  options?: RequestInit,
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+  try {
+    const res = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "Unknown error");
+      throw new ApiError(res.status, body);
+    }
+
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out. The server took too long to respond.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/* ---------- Health ---------- */
+
+export async function fetchHealth(): Promise<HealthResponse> {
+  return request<HealthResponse>("/api/health");
+}
+
+/* ---------- Case Intake ---------- */
+
+export async function submitIntake(
+  payload: IntakeRequest,
+): Promise<IntakeResponse> {
+  return request<IntakeResponse>("/api/intake", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/* ---------- Match Pipeline ---------- */
+
+export async function runMatch(
+  payload: MatchRequest,
+): Promise<MatchResponse> {
+  return request<MatchResponse>("/api/match", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/* ---------- Attorney Roster ---------- */
+
+export async function fetchAttorneys(params?: {
+  jurisdiction?: string;
+  specialization?: string;
+  availability?: string;
+}): Promise<AttorneyListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.jurisdiction) searchParams.set("jurisdiction", params.jurisdiction);
+  if (params?.specialization)
+    searchParams.set("specialization", params.specialization);
+  if (params?.availability) searchParams.set("availability", params.availability);
+
+  const qs = searchParams.toString();
+  const url = qs ? `/api/attorneys?${qs}` : "/api/attorneys";
+  return request<AttorneyListResponse>(url);
+}
+
+/* ---------- Fact Refinement ---------- */
+
+export async function refineFacts(
+  payload: RefineFactsRequest,
+): Promise<RefineFactsResponse> {
+  return request<RefineFactsResponse>("/api/refine-facts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/* ---------- Leaderboard ---------- */
+
+export async function fetchLeaderboard(params?: {
+  domain?: string;
+  jurisdiction?: string;
+  top_n?: number;
+  include_audit?: boolean;
+}): Promise<LeaderboardResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.domain) searchParams.set("domain", params.domain);
+  if (params?.jurisdiction) searchParams.set("jurisdiction", params.jurisdiction);
+  if (params?.top_n !== undefined) searchParams.set("top_n", String(params.top_n));
+  if (params?.include_audit !== undefined) searchParams.set("include_audit", String(params.include_audit));
+
+  const qs = searchParams.toString();
+  const url = qs ? `/api/leaderboard?${qs}` : "/api/leaderboard";
+  return request<LeaderboardResponse>(url);
+}

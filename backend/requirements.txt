@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+google-genai
+anthropic
+python-dotenv
+pydantic
+httpx
+playwright
+aiofiles

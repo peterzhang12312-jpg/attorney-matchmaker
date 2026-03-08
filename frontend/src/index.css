@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #FFFEF2;
+  --ink: #191918;
+  --ink-dim: rgba(25, 25, 24, 0.45);
+  --ink-faint: rgba(25, 25, 24, 0.12);
+  --accent: #FCAA2D;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(25, 25, 24, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(25, 25, 24, 0.2);
+}
+
+/* Smooth transitions for collapsible panels */
+.collapse-transition {
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  overflow: hidden;
+}

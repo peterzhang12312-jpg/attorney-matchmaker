@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------
+# Attorney Matchmaker — .gitignore
+# ---------------------------------------------------------------
+
+# Ignore everything at the root level by default,
+# then explicitly allow only the project files.
+/*
+!/backend/
+!/frontend/
+!/render.yaml
+!/.gitignore
+
+# ---------------------------------------------------------------
+# Backend
+# ---------------------------------------------------------------
+/backend/.env
+/backend/.env.*
+/backend/__pycache__/
+/backend/**/__pycache__/
+/backend/**/*.pyc
+/backend/**/*.pyo
+/backend/.pytest_cache/
+/backend/htmlcov/
+/backend/.coverage
+/backend/venv/
+/backend/.venv/
+
+# ---------------------------------------------------------------
+# Frontend
+# ---------------------------------------------------------------
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.*
+/frontend/.vite/
+
+# ---------------------------------------------------------------
+# OS / IDE
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
