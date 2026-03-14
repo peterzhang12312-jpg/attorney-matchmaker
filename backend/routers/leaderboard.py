@@ -8,14 +8,13 @@ Results are cached for 60 minutes.
 
 from __future__ import annotations
 
-import logging
-from typing import Optional
-
-from fastapi import APIRouter, Query
+import structlog
+from fastapi import APIRouter, Query, Request
+from middleware.rate_limit import limiter
 from models.schemas import LeaderboardResponse
 from services.leaderboard_engine import get_leaderboard
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["Leaderboard"])
 
@@ -28,7 +27,9 @@ _VALID_JURISDICTIONS = {"CA", "NY", "CA+NY"}
     response_model=LeaderboardResponse,
     summary="Get objective attorney leaderboard for a practice domain",
 )
+@limiter.limit("30/minute")
 async def get_leaderboard_endpoint(
+    request: Request,
     domain: str = Query(
         "intellectual_property",
         description="Practice domain: intellectual_property | real_estate | corporate | employment",
@@ -61,5 +62,5 @@ async def get_leaderboard_endpoint(
     if jurisdiction not in _VALID_JURISDICTIONS:
         jurisdiction = "CA+NY"
 
-    logger.info("Leaderboard request: domain=%s jurisdiction=%s top_n=%d", domain, jurisdiction, top_n)
+    log.info("leaderboard_request", domain=domain, jurisdiction=jurisdiction, top_n=top_n)
     return await get_leaderboard(domain=domain, jurisdiction=jurisdiction, top_n=top_n, include_audit=include_audit)

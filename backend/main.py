@@ -10,18 +10,24 @@ Or via the convenience script:
 
 from __future__ import annotations
 
-import logging
 import os
 import pathlib
 import sys
+import uuid
 from contextlib import asynccontextmanager
 
+import structlog
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from middleware.logging_config import setup_logging
+from middleware.rate_limit import limiter
 from models.schemas import ErrorResponse, HealthResponse
 from routers import attorneys, intake, leaderboard, match, refine
 
@@ -31,15 +37,8 @@ from routers import attorneys, intake, leaderboard, match, refine
 
 load_dotenv()  # reads .env in the project root
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    stream=sys.stdout,
-)
-logger = logging.getLogger(__name__)
+setup_logging()
+log = structlog.get_logger()
 
 # Path to the built React frontend (relative to this file's location)
 _HERE = pathlib.Path(__file__).parent
@@ -47,7 +46,7 @@ FRONTEND_DIST = _HERE.parent / "frontend" / "dist"
 
 
 # ---------------------------------------------------------------------------
-# Required environment variables — crash fast if any are missing
+# Required environment variables -- crash fast if any are missing
 # ---------------------------------------------------------------------------
 
 _REQUIRED_KEYS = {
@@ -55,6 +54,20 @@ _REQUIRED_KEYS = {
     "ANTHROPIC_API_KEY":       "Claude Opus audit layer",
     "COURTLISTENER_API_TOKEN": "CourtListener RECAP docket search",
 }
+
+
+# ---------------------------------------------------------------------------
+# X-Request-ID middleware
+# ---------------------------------------------------------------------------
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Attach a unique X-Request-ID header to every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(uuid.uuid4())
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +82,7 @@ async def lifespan(app: FastAPI):
     """
     # --- Startup -----------------------------------------------------------
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
-    logger.info("CORS origins whitelisted: %s", cors_origins)
+    log.info("cors_origins_whitelisted", origins=cors_origins)
 
     missing = [
         f"  {k}  ({desc})"
@@ -77,27 +90,26 @@ async def lifespan(app: FastAPI):
         if not os.getenv(k, "").strip()
     ]
     if missing:
-        logger.critical(
-            "FATAL: Required environment variables are not set:\n%s\n"
-            "Add them to .env and restart.",
-            "\n".join(missing),
+        log.critical(
+            "required_env_vars_missing",
+            missing=missing,
         )
         sys.exit(1)
 
     if FRONTEND_DIST.exists():
-        logger.info("Serving frontend from %s", FRONTEND_DIST)
+        log.info("serving_frontend", path=str(FRONTEND_DIST))
     else:
-        logger.warning("Frontend dist not found at %s — API-only mode", FRONTEND_DIST)
+        log.warning("frontend_dist_not_found", path=str(FRONTEND_DIST))
 
     # Initialize database tables (no-op if they already exist)
     from db.session import init_db
     await init_db()
-    logger.info("Database initialized")
+    log.info("database_initialized")
 
-    logger.info("Fact-Pattern Attorney Matchmaker starting up")
+    log.info("startup_complete", app="Fact-Pattern Attorney Matchmaker")
     yield
     # --- Shutdown ----------------------------------------------------------
-    logger.info("Fact-Pattern Attorney Matchmaker shutting down")
+    log.info("shutdown_complete", app="Fact-Pattern Attorney Matchmaker")
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +129,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# --- Rate limiter ----------------------------------------------------------
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# --- Request ID middleware -------------------------------------------------
+app.add_middleware(RequestIDMiddleware)
+
 # --- CORS ------------------------------------------------------------------
 # In production with the frontend served from this same origin, CORS is not
 # strictly needed. But we keep it for any external API consumers.
@@ -135,11 +154,11 @@ app.include_router(attorneys.router)
 app.include_router(refine.router)
 app.include_router(leaderboard.router)
 
-# Debug router — only active when DEBUG=true in .env
+# Debug router -- only active when DEBUG=true in .env
 if os.getenv("DEBUG", "").lower() in ("true", "1"):
     from routers import debug
     app.include_router(debug.router)
-    logger.info("Debug router enabled: GET /api/debug/intelligence-check")
+    log.info("debug_router_enabled", endpoint="/api/debug/intelligence-check")
 
 
 # --- Health check ----------------------------------------------------------
@@ -168,7 +187,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     Catch-all for unhandled exceptions.  Logs the full traceback and
     returns a structured error response rather than leaking internals.
     """
-    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    log.exception(
+        "unhandled_exception",
+        method=request.method,
+        path=request.url.path,
+    )
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(
@@ -179,7 +202,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # ---------------------------------------------------------------------------
-# Static file serving — React SPA (must come AFTER all API routes)
+# Static file serving -- React SPA (must come AFTER all API routes)
 # ---------------------------------------------------------------------------
 
 if FRONTEND_DIST.exists():
@@ -206,10 +229,11 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.getenv("PORT", "8080"))
+    log_level = os.getenv("LOG_LEVEL", "INFO").lower()
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=port,
         reload=False,
-        log_level=LOG_LEVEL.lower(),
+        log_level=log_level,
     )

@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +70,17 @@ class BudgetGoals(BaseModel):
 
 class RefineFactsRequest(BaseModel):
     """Payload for the stateless fact-refinement endpoint."""
-    facts: str = Field(..., min_length=20, max_length=10_000)
+    facts: str = Field(..., min_length=20, max_length=5_000)
+
+    @field_validator("facts")
+    @classmethod
+    def facts_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Facts cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Facts must be under 5000 characters")
+        return v
 
 
 class RefineFactsResponse(BaseModel):
@@ -87,9 +97,19 @@ class CaseIntakeRequest(BaseModel):
     description: str = Field(
         ...,
         min_length=20,
-        max_length=10_000,
+        max_length=5_000,
         description="Free-text narrative of the case facts.",
     )
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Description cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Description must be under 5000 characters")
+        return v
     legal_area: Optional[str] = Field(
         None,
         description=(

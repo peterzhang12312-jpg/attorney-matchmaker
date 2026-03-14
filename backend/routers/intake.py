@@ -7,23 +7,24 @@ the submission in the database so the match endpoint can retrieve it later.
 
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Case
-from db.queries import get_case  # noqa: F401 — re-exported for backward compat
+from db.queries import get_case  # noqa: F401 -- re-exported for backward compat
 from db.session import get_db
+from middleware.rate_limit import limiter
 from models.schemas import (
     CaseIntakeRequest,
     CaseIntakeResponse,
     ErrorResponse,
 )
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["intake"])
 
@@ -46,7 +47,9 @@ router = APIRouter(prefix="/api", tags=["intake"])
         "to trigger the full matching pipeline."
     ),
 )
+@limiter.limit("10/minute")
 async def create_intake(
+    request: Request,
     body: CaseIntakeRequest,
     db: AsyncSession = Depends(get_db),
 ) -> CaseIntakeResponse:
@@ -79,12 +82,12 @@ async def create_intake(
     db.add(case)
     await db.commit()
 
-    logger.info(
-        "Case ingested: id=%s, jurisdiction=%s, urgency=%s, description_len=%d",
-        case_id,
-        body.jurisdiction,
-        body.urgency.value,
-        len(body.description),
+    log.info(
+        "case_ingested",
+        case_id=case_id,
+        jurisdiction=body.jurisdiction,
+        urgency=body.urgency.value,
+        description_len=len(body.description),
     )
 
     return CaseIntakeResponse(

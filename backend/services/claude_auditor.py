@@ -19,8 +19,9 @@ in the deterministic matcher or misclassifications from Gemini.
 from __future__ import annotations
 
 import json
-import logging
 import os
+
+import structlog
 from typing import Any
 
 import anthropic
@@ -34,7 +35,7 @@ from models.schemas import (
     MatchCandidate,
 )
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 AUDIT_MODEL = "claude-opus-4-6"
 
@@ -166,9 +167,9 @@ async def audit_matches(
             "this experience.\n\n"
         )
         user_content = priority_directive + user_content
-        logger.info("Evasive defendant mode: prepended priority directive to audit prompt")
+        log.info("Evasive defendant mode: prepended priority directive to audit prompt")
 
-    logger.info(
+    log.info(
         "Sending %d candidates to Claude Opus for audit (payload: %d chars)",
         len(candidates),
         len(user_content),
@@ -185,7 +186,7 @@ async def audit_matches(
             ],
         )
     except (anthropic.APIError, anthropic.APIStatusError) as exc:
-        logger.error("Anthropic API error during audit: %s", exc)
+        log.error("Anthropic API error during audit: %s", exc)
         raise RuntimeError(f"Claude Opus audit API error: {exc}") from exc
 
     # Extract text from the response
@@ -195,7 +196,7 @@ async def audit_matches(
             raw_text += block.text
 
     raw_text = raw_text.strip()
-    logger.debug("Opus raw audit response: %s", raw_text[:500])
+    log.debug("Opus raw audit response: %s", raw_text[:500])
 
     parsed = _extract_json(raw_text)
     if parsed is None:
@@ -216,10 +217,10 @@ async def audit_matches(
             audit_model=AUDIT_MODEL,
         )
     except Exception as exc:
-        logger.error("Schema validation failed for audit output: %s", exc)
+        log.error("Schema validation failed for audit output: %s", exc)
         raise ValueError(f"Audit output failed schema validation: {exc}") from exc
 
-    logger.info(
+    log.info(
         "Audit complete: %d matches audited, model=%s",
         len(result.audited_matches),
         AUDIT_MODEL,

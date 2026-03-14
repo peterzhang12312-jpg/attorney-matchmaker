@@ -14,12 +14,12 @@ old JurisdictionPicker / VenueStep manual flow.
 
 from __future__ import annotations
 
-import logging
+import structlog
 from typing import Optional
 
 from models.schemas import GeminiAnalysis, VenueRecommendation
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 # ---------------------------------------------------------------------------
 # Court label map
@@ -115,12 +115,12 @@ async def recommend_venue(
         if not diversity:
             diversity = True
             unknown_defendant = False
-            logger.info(
+            log.info(
                 "Corporate HQ diversity override: hq=%s -> federal venue",
                 corporate_hq_state,
             )
 
-    logger.info(
+    log.info(
         "Venue optimizer: federal_q=%s, diversity=%s, unknown_defendant=%s, corp_hq=%s",
         federal_q, diversity, unknown_defendant, corporate_hq_state,
     )

@@ -6,15 +6,15 @@ GET /api/attorneys -- returns the attorney roster with optional filters.
 
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Query
 
 from data.attorneys import get_all_attorneys
 from models.schemas import AttorneyListResponse, Availability
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["attorneys"])
 
@@ -67,13 +67,12 @@ async def list_attorneys(
             if a.availability == availability
         ]
 
-    logger.info(
-        "Attorney listing: %d results (filters: specialization=%s, "
-        "jurisdiction=%s, availability=%s)",
-        len(attorneys),
-        specialization,
-        jurisdiction,
-        availability,
+    log.info(
+        "attorney_listing",
+        result_count=len(attorneys),
+        specialization=specialization,
+        jurisdiction=jurisdiction,
+        availability=availability,
     )
 
     return AttorneyListResponse(

@@ -10,3 +10,5 @@ aiofiles
 sqlalchemy>=2.0.0
 asyncpg>=0.29.0
 aiosqlite>=0.19.0
+slowapi>=0.1.9
+structlog>=24.0.0

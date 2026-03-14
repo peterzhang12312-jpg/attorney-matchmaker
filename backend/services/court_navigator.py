@@ -17,15 +17,16 @@ Usage
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
+
+import structlog
 from typing import Optional
 
 import httpx
 
 from models.schemas import CourtRecord, CourtVerificationResult
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 # PACER Case Locator endpoints
 _PCL_LOGIN = "https://pacer.uscourts.gov/pcl-public-api/rest/login"
@@ -58,7 +59,7 @@ async def search_nyscef_guest(
     try:
         from playwright.async_api import async_playwright
     except ImportError:
-        logger.warning("Playwright not installed -- NYSCEF search unavailable. "
+        log.warning("Playwright not installed -- NYSCEF search unavailable. "
                        "Run: pip install playwright && playwright install chromium")
         return []
 
@@ -88,7 +89,7 @@ async def search_nyscef_guest(
                     if await text_inputs.count() > 0:
                         await text_inputs.first.fill(search_term)
                     else:
-                        logger.debug("NYSCEF: no suitable input field found")
+                        log.debug("NYSCEF: no suitable input field found")
                         return []
 
                 # Submit
@@ -126,15 +127,15 @@ async def search_nyscef_guest(
                             verified=True,
                         ))
                     except Exception as row_exc:
-                        logger.debug("NYSCEF row %d parse error: %s", i, row_exc)
+                        log.debug("NYSCEF row %d parse error: %s", i, row_exc)
             finally:
                 await browser.close()
 
     except Exception as exc:
-        logger.debug("NYSCEF search failed (non-fatal): %s", exc)
+        log.debug("NYSCEF search failed (non-fatal): %s", exc)
         return []
 
-    logger.info("NYSCEF: %d records found (county=%s)", len(records), county)
+    log.info("NYSCEF: %d records found (county=%s)", len(records), county)
     return records[:10]
 
 
@@ -163,7 +164,7 @@ async def _pcl_login(client: httpx.AsyncClient) -> Optional[str]:
         )
         return token
     except Exception as exc:
-        logger.debug("PACER PCL login failed: %s", exc)
+        log.debug("PACER PCL login failed: %s", exc)
         return None
 
 
@@ -182,16 +183,16 @@ async def search_pacer_pcl(
     Returns [] if PACER_USERNAME is not set in .env.
     """
     if not os.getenv("PACER_USERNAME", "").strip():
-        logger.debug("PACER_USERNAME not set -- PCL search skipped")
+        log.debug("PACER_USERNAME not set -- PCL search skipped")
         return []
 
     fee_protection = os.getenv("PACER_FEE_PROTECTION", "true").lower() == "true"
-    logger.debug("PACER PCL fee protection=%s", fee_protection)
+    log.debug("PACER PCL fee protection=%s", fee_protection)
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         token = await _pcl_login(client)
         if not token:
-            logger.warning("PACER PCL: authentication failed -- skipping PCL search")
+            log.warning("PACER PCL: authentication failed -- skipping PCL search")
             return []
 
         headers = {"X-Auth-Token": token, "Accept": "application/json"}
@@ -220,7 +221,7 @@ async def search_pacer_pcl(
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            logger.debug("PACER PCL search failed: %s", exc)
+            log.debug("PACER PCL search failed: %s", exc)
             return []
 
     cases = data.get("cases") or data.get("results") or []
@@ -248,9 +249,9 @@ async def search_pacer_pcl(
                 verified=True,
             ))
         except Exception as exc:
-            logger.debug("PACER PCL case parse error: %s", exc)
+            log.debug("PACER PCL case parse error: %s", exc)
 
-    logger.info("PACER PCL: %d records found (courts=%s)", len(records), court_ids)
+    log.info("PACER PCL: %d records found (courts=%s)", len(records), court_ids)
     return records[:10]
 
 
@@ -372,7 +373,7 @@ async def verify_attorneys(
             timeout=20.0,
         )
     except asyncio.TimeoutError:
-        logger.warning("Court verification timed out after 20s")
+        log.warning("Court verification timed out after 20s")
         return [
             CourtVerificationResult(
                 attorney_name=name,
@@ -397,7 +398,7 @@ async def verify_attorneys(
         else:
             final.append(result)
 
-    logger.info(
+    log.info(
         "Court verification complete: %d attorneys, %d with records",
         len(final),
         sum(1 for r in final if r.records_found > 0),

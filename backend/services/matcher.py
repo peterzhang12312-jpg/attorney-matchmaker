@@ -19,7 +19,7 @@ Scoring Rubric (100-point scale)
 
 from __future__ import annotations
 
-import logging
+import structlog
 from typing import Optional
 
 from data.attorneys import get_all_attorneys
@@ -34,7 +34,7 @@ from models.schemas import (
 from services.courtlistener_client import fetch_attorneys_by_keywords, _COURT_JURISDICTIONS
 from services.gemini_analyzer import extract_search_keywords
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 TOP_N = 5
 
@@ -330,7 +330,7 @@ async def _enrich_with_caselaw(
                 bd.availability_score + bd.win_rate_score + bd.budget_score + new_alignment
             ), 2)
             candidate.score_breakdown.composite = new_composite
-            logger.info(
+            log.info(
                 "CAP landmark bonus: %s -> composite %.1f",
                 candidate.attorney.name, new_composite,
             )
@@ -389,7 +389,7 @@ async def find_matches(
         and _extract_state(defendant_loc) != ""
     )
     if diversity_eligible:
-        logger.info(
+        log.info(
             "Diversity jurisdiction detected: plaintiff=%s, defendant=%s",
             plaintiff_loc, defendant_loc,
         )
@@ -398,7 +398,7 @@ async def find_matches(
     if case_description:
         try:
             kw = await extract_search_keywords(case_description, analysis)
-            logger.info(
+            log.info(
                 "CL keywords: query=%r  nos=%s  courts=%s",
                 kw.search_query, kw.nature_of_suit_codes, kw.target_court_ids,
             )
@@ -417,12 +417,12 @@ async def find_matches(
                 attorneys = live
                 data_source = "courtlistener"
             else:
-                logger.info(
+                log.info(
                     "CL returned %d profiles (need ≥3); falling back to static data",
                     len(live),
                 )
         except Exception as exc:
-            logger.warning("CL pipeline error, using static data: %s", exc)
+            log.warning("CL pipeline error, using static data: %s", exc)
 
     # ------ Static fallback --------------------------------------------------
     if not attorneys:
@@ -433,7 +433,7 @@ async def find_matches(
             a for a in attorneys if a.availability != Availability.UNAVAILABLE
         ]
 
-    logger.info(
+    log.info(
         "Scoring %d attorneys (source=%s, primary_area=%s, jurisdiction=%s)",
         len(attorneys),
         data_source,
@@ -492,9 +492,9 @@ async def find_matches(
         try:
             top = await _enrich_with_caselaw(top, analysis)
         except Exception as exc:
-            logger.warning("Caselaw enrichment failed (non-fatal): %s", exc)
+            log.warning("Caselaw enrichment failed (non-fatal): %s", exc)
 
-    logger.info(
+    log.info(
         "Top %d matches: %s",
         len(top),
         [(m.attorney.name, m.score_breakdown.composite) for m in top],
