@@ -7,6 +7,7 @@ the submission in the database so the match endpoint can retrieve it later.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -78,6 +79,7 @@ async def create_intake(
         urgency=body.urgency.value,
         budget_goals=body.budget_goals.model_dump() if body.budget_goals else None,
         advanced_fields=advanced_fields,
+        client_email=body.client_email,
     )
     db.add(case)
     await db.commit()
@@ -89,6 +91,16 @@ async def create_intake(
         urgency=body.urgency.value,
         description_len=len(body.description),
     )
+
+    # Fire-and-forget confirmation email (non-blocking)
+    if body.client_email:
+        from services.email import send_case_confirmation
+        asyncio.create_task(send_case_confirmation(
+            to_email=body.client_email,
+            case_id=case_id,
+            practice_area=body.legal_area or "",
+            urgency=body.urgency.value,
+        ))
 
     return CaseIntakeResponse(
         case_id=case_id,

@@ -6,6 +6,7 @@ All routes are prefixed with /attorney (the /api prefix is added in main.py).
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import jwt
@@ -15,7 +16,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.attorney_auth import create_token, decode_token, hash_password, verify_password
-from db.models import AttorneyRegistered, Lead
+from db.models import AttorneyRegistered, Case, Lead
 from db.session import get_db
 from middleware.rate_limit import limiter
 from models.schemas import (
@@ -320,6 +321,24 @@ async def respond_to_lead(
         attorney_id=attorney.id,
         action=body.action,
     )
+
+    # Notify client when an attorney accepts their lead
+    if body.action == "accept":
+        try:
+            from services.email import send_lead_accepted_to_client
+            case_result = await db.execute(
+                select(Case).where(Case.case_id == lead.case_id)
+            )
+            case_row = case_result.scalar_one_or_none()
+            client_email = getattr(case_row, "client_email", None) if case_row else None
+            if client_email:
+                asyncio.create_task(send_lead_accepted_to_client(
+                    client_email=client_email,
+                    attorney_name=attorney.name,
+                    firm=attorney.firm or "",
+                ))
+        except Exception as exc:
+            log.warning("lead_accepted_email_failed", error=str(exc))
 
     return LeadSummary(
         id=lead.id,

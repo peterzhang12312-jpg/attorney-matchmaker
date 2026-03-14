@@ -17,9 +17,10 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import MatchResult as MatchResultRow
+from db.models import AttorneyRegistered, Lead, MatchResult as MatchResultRow
 from db.queries import get_case
 from db.session import get_db
 from middleware.rate_limit import limiter
@@ -268,5 +269,64 @@ async def run_match_pipeline(
         await db.commit()
     except Exception as exc:
         log.warning("match_persist_failed", error=str(exc))
+
+    # ----- Step 6: Email notifications & lead creation (best-effort) --------
+    try:
+        from services.email import send_matches_ready, send_lead_to_attorney
+
+        # Notify client that matches are ready
+        client_email = getattr(case_row, "client_email", None) or ""
+        if client_email and candidates:
+            asyncio.create_task(send_matches_ready(
+                to_email=client_email,
+                case_id=body.case_id,
+                match_count=len(candidates),
+            ))
+
+        # Create Lead rows for top 3 matched attorneys (if they are registered)
+        # and send lead notification emails
+        practice_area = analysis.primary_legal_area
+        jurisdiction = analysis.jurisdiction
+        top_names = [c.attorney.name for c in candidates[:3]]
+
+        if top_names:
+            result = await db.execute(
+                select(AttorneyRegistered).where(
+                    AttorneyRegistered.name.in_(top_names),
+                    AttorneyRegistered.accepting_clients == "true",
+                )
+            )
+            registered = result.scalars().all()
+
+            for atty in registered:
+                lead = Lead(
+                    case_id=body.case_id,
+                    attorney_id=atty.id,
+                    status="sent",
+                    case_summary={
+                        "practice_area": practice_area,
+                        "urgency": client_urgency,
+                        "jurisdiction": jurisdiction,
+                    },
+                )
+                db.add(lead)
+                # Fire-and-forget email to attorney
+                asyncio.create_task(send_lead_to_attorney(
+                    attorney_email=atty.email,
+                    attorney_name=atty.name,
+                    practice_area=practice_area,
+                    urgency=client_urgency,
+                    jurisdiction=jurisdiction,
+                ))
+
+            if registered:
+                await db.commit()
+                log.info(
+                    "leads_created",
+                    case_id=body.case_id,
+                    lead_count=len(registered),
+                )
+    except Exception as exc:
+        log.warning("email_lead_creation_failed", error=str(exc))
 
     return response

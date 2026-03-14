@@ -145,6 +145,7 @@ class CaseIntakeRequest(BaseModel):
     evasive_defendant: bool = Field(False,
         description="Triggers alternative-service keyword injection in docket search.")
     advanced_mode: bool = Field(False, description="True when submitted via advanced intake grid.")
+    client_email: Optional[str] = Field(None, description="Client email for match notifications (optional).")
 
 
 class MatchRequest(BaseModel):

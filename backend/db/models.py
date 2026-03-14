@@ -28,6 +28,7 @@ class Case(Base):
     urgency = Column(String, nullable=False, default="medium")
     budget_goals = Column(JSON, nullable=True)
     advanced_fields = Column(JSON, nullable=True)
+    client_email = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     match_results = relationship(
