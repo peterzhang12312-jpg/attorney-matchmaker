@@ -89,6 +89,11 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Frontend dist not found at %s — API-only mode", FRONTEND_DIST)
 
+    # Initialize database tables (no-op if they already exist)
+    from db.session import init_db
+    await init_db()
+    logger.info("Database initialized")
+
     logger.info("Fact-Pattern Attorney Matchmaker starting up")
     yield
     # --- Shutdown ----------------------------------------------------------

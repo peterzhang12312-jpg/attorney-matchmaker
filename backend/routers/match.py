@@ -16,14 +16,17 @@ import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.models import MatchResult as MatchResultRow
+from db.queries import get_case
+from db.session import get_db
 from models.schemas import (
     ErrorResponse,
     MatchRequest,
     MatchResponse,
 )
-from routers.intake import get_case
 from services.claude_auditor import audit_matches
 from services.court_navigator import verify_attorneys
 from services.gemini_analyzer import analyze_case
@@ -49,44 +52,48 @@ router = APIRouter(prefix="/api", tags=["matching"])
         "Returns the complete analysis, ranked matches, and audit results."
     ),
 )
-async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
+async def run_match_pipeline(
+    body: MatchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MatchResponse:
     start = time.monotonic()
     warnings: list[str] = []
 
     # ----- Step 0: Retrieve the case ----------------------------------------
-    case_data = get_case(body.case_id)
-    if case_data is None:
+    case_row = await get_case(body.case_id, db)
+    if case_row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Case {body.case_id} not found. Submit facts via /api/intake first.",
         )
 
-    description = case_data["description"]
-    client_legal_area = case_data.get("legal_area")
-    client_jurisdiction = case_data.get("jurisdiction")
-    client_urgency = case_data.get("urgency", "medium")
+    description = case_row.description
+    adv = case_row.advanced_fields or {}
+    client_legal_area = adv.get("legal_area")
+    client_jurisdiction = adv.get("jurisdiction")
+    client_urgency = case_row.urgency or "medium"
 
     # Extract budget goals if the client provided them at intake
-    budget_goals_data = case_data.get("budget_goals")
+    budget_goals_data = case_row.budget_goals
     budget_goals = None
     if budget_goals_data:
         from models.schemas import BudgetGoals
         budget_goals = BudgetGoals(**budget_goals_data)
 
-    evasive_defendant = case_data.get("evasive_defendant", False)
+    evasive_defendant = adv.get("evasive_defendant", False)
 
     # Build case_meta for jurisdictional alignment scorer
     case_meta = {
         "jurisdiction": client_jurisdiction,
-        "county": case_data.get("county"),
-        "plaintiff_location": case_data.get("plaintiff_location"),
-        "defendant_location": case_data.get("defendant_location"),
-        "federal_question": case_data.get("federal_question"),
-        "procedural_flags": case_data.get("procedural_flags"),
-        "subject_matter_jurisdiction": case_data.get("subject_matter_jurisdiction"),
-        "personal_jurisdiction_basis": case_data.get("personal_jurisdiction_basis"),
-        "procedural_posture": case_data.get("procedural_posture"),
-        "primary_remedy": case_data.get("primary_remedy"),
+        "county": adv.get("county"),
+        "plaintiff_location": adv.get("plaintiff_location"),
+        "defendant_location": adv.get("defendant_location"),
+        "federal_question": adv.get("federal_question"),
+        "procedural_flags": adv.get("procedural_flags"),
+        "subject_matter_jurisdiction": adv.get("subject_matter_jurisdiction"),
+        "personal_jurisdiction_basis": adv.get("personal_jurisdiction_basis"),
+        "procedural_posture": adv.get("procedural_posture"),
+        "primary_remedy": adv.get("primary_remedy"),
         "evasive_defendant": evasive_defendant,
     }
 
@@ -232,7 +239,7 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
         audit is not None,
     )
 
-    return MatchResponse(
+    response = MatchResponse(
         case_id=body.case_id,
         gemini_analysis=analysis,
         matches=candidates,
@@ -241,3 +248,21 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
         warnings=warnings,
         venue_recommendation=venue_recommendation,
     )
+
+    # ----- Step 5: Persist match results ------------------------------------
+    try:
+        match_row = MatchResultRow(
+            case_id=body.case_id,
+            matches=[m.model_dump(mode="json") for m in candidates],
+            audit=audit,
+            venue_recommendation=(
+                venue_recommendation.model_dump(mode="json")
+                if venue_recommendation else None
+            ),
+        )
+        db.add(match_row)
+        await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to persist match results (non-fatal): %s", exc)
+
+    return response
