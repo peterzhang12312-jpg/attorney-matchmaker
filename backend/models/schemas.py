@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +70,17 @@ class BudgetGoals(BaseModel):
 
 class RefineFactsRequest(BaseModel):
     """Payload for the stateless fact-refinement endpoint."""
-    facts: str = Field(..., min_length=20, max_length=10_000)
+    facts: str = Field(..., min_length=20, max_length=5_000)
+
+    @field_validator("facts")
+    @classmethod
+    def facts_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Facts cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Facts must be under 5000 characters")
+        return v
 
 
 class RefineFactsResponse(BaseModel):
@@ -87,9 +97,19 @@ class CaseIntakeRequest(BaseModel):
     description: str = Field(
         ...,
         min_length=20,
-        max_length=10_000,
+        max_length=5_000,
         description="Free-text narrative of the case facts.",
     )
+
+    @field_validator("description")
+    @classmethod
+    def description_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Description cannot be empty")
+        if len(v) > 5000:
+            raise ValueError("Description must be under 5000 characters")
+        return v
     legal_area: Optional[str] = Field(
         None,
         description=(
@@ -125,6 +145,7 @@ class CaseIntakeRequest(BaseModel):
     evasive_defendant: bool = Field(False,
         description="Triggers alternative-service keyword injection in docket search.")
     advanced_mode: bool = Field(False, description="True when submitted via advanced intake grid.")
+    client_email: Optional[str] = Field(None, description="Client email for match notifications (optional).")
 
 
 class MatchRequest(BaseModel):
@@ -325,8 +346,8 @@ class ScoreBreakdown(BaseModel):
 
 
 class CourtRecord(BaseModel):
-    """A single case record found via live court verification (NYSCEF or PACER PCL)."""
-    source: str                           # "pacer_pcl" | "nyscef"
+    """A single case record found via live court verification."""
+    source: str                           # "courtlistener" | "pacer_pcl"
     case_name: str
     docket_number: str
     court: str
@@ -342,8 +363,10 @@ class CourtVerificationResult(BaseModel):
     attorney_name: str
     records_found: int
     court_records: list[CourtRecord] = []
-    source: str                           # "pacer_pcl" | "nyscef" | "none"
+    source: str                           # "courtlistener" | "pacer_pcl" | "none"
     error: Optional[str] = None
+    verification_url: Optional[str] = None  # NYSCEF manual search URL
+    checked_at: Optional[str] = None        # ISO 8601 timestamp
 
 
 class MatchCandidate(BaseModel):
@@ -504,3 +527,79 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     request_id: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Attorney self-onboarding schemas
+# ---------------------------------------------------------------------------
+
+class AttorneyRegisterRequest(BaseModel):
+    """Payload for attorney self-registration."""
+    name: str = Field(..., min_length=1, max_length=200)
+    email: str = Field(..., min_length=5, max_length=254)
+    password: str = Field(..., min_length=8, max_length=128)
+    bar_number: Optional[str] = None
+    firm: Optional[str] = None
+    jurisdictions: Optional[list[str]] = None
+    practice_areas: Optional[list[str]] = None
+    hourly_rate: Optional[str] = None
+    availability: Optional[str] = "available"
+    accepting_clients: Optional[bool] = True
+
+
+class AttorneyProfileUpdate(BaseModel):
+    """Partial update for an attorney's own profile."""
+    bar_number: Optional[str] = None
+    firm: Optional[str] = None
+    jurisdictions: Optional[list[str]] = None
+    practice_areas: Optional[list[str]] = None
+    hourly_rate: Optional[str] = None
+    availability: Optional[str] = None
+    accepting_clients: Optional[bool] = None
+
+
+class AttorneyLoginRequest(BaseModel):
+    """Credentials for attorney login."""
+    email: str
+    password: str
+
+
+class AttorneyLoginResponse(BaseModel):
+    """Returned on successful authentication."""
+    token: str
+    attorney_id: str
+    name: str
+    is_founding: bool
+
+
+class AttorneyProfileResponse(BaseModel):
+    """Public-facing attorney profile (no password hash)."""
+    id: str
+    name: str
+    email: str
+    bar_number: Optional[str]
+    firm: Optional[str]
+    jurisdictions: Optional[list[str]]
+    practice_areas: Optional[list[str]]
+    hourly_rate: Optional[str]
+    availability: str
+    accepting_clients: bool
+    is_founding: bool
+    created_at: Optional[str]
+
+
+class LeadSummary(BaseModel):
+    """A single lead as seen by the receiving attorney (no PII)."""
+    id: str
+    case_id: str
+    status: str
+    practice_area: Optional[str]
+    urgency: Optional[str]
+    jurisdiction: Optional[str]
+    sent_at: Optional[str]
+    responded_at: Optional[str]
+
+
+class LeadRespondRequest(BaseModel):
+    """Attorney's accept/decline action on a lead."""
+    action: str = Field(..., pattern="^(accept|decline)$")

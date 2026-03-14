@@ -235,7 +235,7 @@ function SlideHeader({ step, headline, subtitle }: { step: number; headline: str
       <div className="font-mono text-[0.68rem] text-[rgba(25,25,24,0.45)] uppercase tracking-widest mb-4">
         Step {step} of {TOTAL_STEPS}
       </div>
-      <h2 className="text-4xl font-light text-[#191918] mb-2">{headline}</h2>
+      <h2 className="text-2xl sm:text-4xl font-light text-[#191918] mb-2">{headline}</h2>
       {subtitle && <p className="text-[rgba(25,25,24,0.45)] text-sm mb-8">{subtitle}</p>}
     </>
   );
@@ -261,13 +261,13 @@ function NavRow({
   showBack?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between mt-10">
+    <div className="flex items-center justify-between mt-10 gap-3">
       {showBack && onBack ? (
         <button
           type="button"
           onClick={onBack}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] text-sm text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" />
           Back
@@ -279,7 +279,7 @@ function NavRow({
         type="button"
         onClick={onNext}
         disabled={nextDisabled || loading}
-        className="inline-flex items-center gap-2 rounded-md bg-[#FCAA2D] px-7 py-3 font-mono text-[0.7rem] uppercase tracking-wide text-[#191918] hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="inline-flex items-center justify-center gap-2 rounded-md bg-[#FCAA2D] px-5 sm:px-7 py-3 min-h-[44px] font-mono text-[0.7rem] uppercase tracking-wide text-[#191918] hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {loading ? (
           <>
@@ -469,7 +469,7 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
                 type="button"
                 disabled={!canAdvanceStep1 || refineLoading}
                 onClick={handleGetQuestions}
-                className="inline-flex items-center gap-2 rounded-md bg-[#FCAA2D] px-7 py-3 font-mono text-[0.7rem] uppercase tracking-wide text-[#191918] hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#FCAA2D] w-full sm:w-auto px-5 sm:px-7 py-3 min-h-[44px] font-mono text-[0.7rem] uppercase tracking-wide text-[#191918] hover:bg-amber-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {refineLoading ? (
                   <>
@@ -563,7 +563,7 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
               subtitle="Review your submission before we find the right counsel."
             />
 
-            <div className="rounded-xl border border-[rgba(25,25,24,0.12)] overflow-hidden mb-4">
+            <div className="rounded-xl border border-[rgba(25,25,24,0.12)] overflow-hidden mb-4 overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-[rgba(25,25,24,0.06)]">
                   <tr className="bg-white">

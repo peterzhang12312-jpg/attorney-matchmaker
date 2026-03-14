@@ -36,8 +36,9 @@ Rate limit: 5,000 requests / hour (authenticated users).
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
+
+import structlog
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -52,7 +53,7 @@ from models.schemas import (
     MotionRecord,
 )
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 _BASE = "https://www.courtlistener.com/api/rest/v4"
 
@@ -162,7 +163,7 @@ async def _nos_fallback_search(
                     continue
                 dockets = resp.json().get("results") or []
             except Exception as exc:
-                logger.debug("NOS fallback %s/%s error: %s", nos_code, court_id, exc)
+                log.debug("NOS fallback %s/%s error: %s", nos_code, court_id, exc)
                 continue
 
             court_jurs = _COURT_JURISDICTIONS.get(court_id, [court_id.upper()])
@@ -197,7 +198,7 @@ async def _nos_fallback_search(
             break
 
     if profiles:
-        logger.info(
+        log.info(
             "NOS fallback: %d attorney profiles from nos_codes=%s",
             len(profiles), nos_codes,
         )
@@ -228,14 +229,14 @@ async def _search_dockets(
         "filed_after": _filed_after(),
         "order_by":    "score desc",
     }
-    logger.info(
+    log.info(
         "CL search: q=%r  courts=%s  filed_after=%s",
         query, params["court"], params["filed_after"],
     )
     resp = await client.get(f"{_BASE}/search/", params=params)
     resp.raise_for_status()
     results = resp.json().get("results", [])
-    logger.info("CL search: %d raw results", len(results))
+    log.info("CL search: %d raw results", len(results))
     return results[:max_results]
 
 
@@ -313,7 +314,7 @@ def _profiles_from_result(
         ))
 
     if profiles:
-        logger.debug(
+        log.debug(
             "CL: extracted %d attorneys from %r (suit=%s)",
             len(profiles), case_name, suit_nature,
         )
@@ -367,7 +368,7 @@ async def _fetch_docket_meta(docket_id: Any, client: httpx.AsyncClient) -> dict[
         if resp.status_code == 200:
             return resp.json()
     except Exception as exc:
-        logger.debug("_fetch_docket_meta(%s) failed: %s", docket_id, exc)
+        log.debug("_fetch_docket_meta(%s) failed: %s", docket_id, exc)
     return {}
 
 
@@ -392,7 +393,7 @@ async def _fetch_docket_entries(docket_id: Any, client: httpx.AsyncClient) -> li
         if resp.status_code == 200:
             return resp.json().get("results", [])
     except Exception as exc:
-        logger.debug("_fetch_docket_entries(%s) failed: %s", docket_id, exc)
+        log.debug("_fetch_docket_entries(%s) failed: %s", docket_id, exc)
     return []
 
 
@@ -577,7 +578,7 @@ async def fetch_attorneys_by_keywords(
     try:
         hdrs = _headers()
     except RuntimeError as exc:
-        logger.warning("CourtListener disabled: %s", exc)
+        log.warning("CourtListener disabled: %s", exc)
         return []
 
     target_courts = list(court_ids) if court_ids else list(SCOPED_COURTS.keys())
@@ -590,7 +591,7 @@ async def fetch_attorneys_by_keywords(
             for cc in county_courts:
                 if cc not in target_courts:
                     target_courts.append(cc)
-            logger.info("Added county courts for %s: %s", county, county_courts)
+            log.info("Added county courts for %s: %s", county, county_courts)
 
     specs = inferred_specializations or ["general_litigation"]
 
@@ -599,10 +600,10 @@ async def fetch_attorneys_by_keywords(
             ' "substituted service" OR "service by publication" OR "alternative service"'
         )
         search_query += alt_terms
-        logger.info("Evasive defendant mode: injected alt-service keywords into CL query")
+        log.info("Evasive defendant mode: injected alt-service keywords into CL query")
 
     if nature_of_suit_codes:
-        logger.info(
+        log.info(
             "NOS codes %s noted (CL full-text search does not filter by NOS)",
             nature_of_suit_codes,
         )
@@ -615,21 +616,21 @@ async def fetch_attorneys_by_keywords(
                 client, search_query, target_courts, max_results=10
             )
         except httpx.HTTPStatusError as exc:
-            logger.error("CL search HTTP %s: %s", exc.response.status_code, exc)
+            log.error("CL search HTTP %s: %s", exc.response.status_code, exc)
             return []
         except Exception as exc:
-            logger.error("CL search failed: %s", exc)
+            log.error("CL search failed: %s", exc)
             return []
 
         if not results:
-            logger.info("CL: 0 dockets for query %r", search_query)
+            log.info("CL: 0 dockets for query %r", search_query)
             # Attempt NOS fallback before giving up
             if nature_of_suit_codes:
                 nos_profiles = await _nos_fallback_search(
                     client, nature_of_suit_codes, target_courts, specs
                 )
                 if nos_profiles:
-                    logger.info("NOS fallback produced %d profiles", len(nos_profiles))
+                    log.info("NOS fallback produced %d profiles", len(nos_profiles))
                     return nos_profiles[:top_n]
             return []
 
@@ -656,7 +657,7 @@ async def fetch_attorneys_by_keywords(
 
         # If primary search yielded < 3 profiles, supplement with NOS fallback
         if len(profiles) < 3 and nature_of_suit_codes:
-            logger.info(
+            log.info(
                 "CL primary search: %d profiles (< 3); attempting NOS fallback nos=%s",
                 len(profiles), nature_of_suit_codes,
             )
@@ -673,7 +674,7 @@ async def fetch_attorneys_by_keywords(
 
         # Step 3 (optional): Fetch docket meta + entries for motion intelligence
         if fetch_docket_details and profiles:
-            logger.info(
+            log.info(
                 "CL: fetching docket details for %d attorneys (%d dockets)",
                 len(profiles), len(results),
             )
@@ -685,7 +686,7 @@ async def fetch_attorneys_by_keywords(
             for profile, intel in zip(profiles, intelligence_list):
                 profile.docket_intelligence = intel
 
-    logger.info(
+    log.info(
         "CL: %d unique attorney profiles from %d dockets",
         len(profiles), len(results),
     )

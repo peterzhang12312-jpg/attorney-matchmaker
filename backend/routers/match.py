@@ -12,25 +12,30 @@ POST /api/match -- orchestrates the full pipeline:
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.models import AttorneyRegistered, Lead, MatchResult as MatchResultRow
+from db.queries import get_case
+from db.session import get_db
+from middleware.rate_limit import limiter
 from models.schemas import (
     ErrorResponse,
     MatchRequest,
     MatchResponse,
 )
-from routers.intake import get_case
 from services.claude_auditor import audit_matches
 from services.court_navigator import verify_attorneys
 from services.gemini_analyzer import analyze_case
 from services.matcher import find_matches
 from services.venue_optimizer import recommend_venue
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["matching"])
 
@@ -49,48 +54,54 @@ router = APIRouter(prefix="/api", tags=["matching"])
         "Returns the complete analysis, ranked matches, and audit results."
     ),
 )
-async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
+@limiter.limit("5/minute")
+async def run_match_pipeline(
+    request: Request,
+    body: MatchRequest,
+    db: AsyncSession = Depends(get_db),
+) -> MatchResponse:
     start = time.monotonic()
     warnings: list[str] = []
 
     # ----- Step 0: Retrieve the case ----------------------------------------
-    case_data = get_case(body.case_id)
-    if case_data is None:
+    case_row = await get_case(body.case_id, db)
+    if case_row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Case {body.case_id} not found. Submit facts via /api/intake first.",
         )
 
-    description = case_data["description"]
-    client_legal_area = case_data.get("legal_area")
-    client_jurisdiction = case_data.get("jurisdiction")
-    client_urgency = case_data.get("urgency", "medium")
+    description = case_row.description
+    adv = case_row.advanced_fields or {}
+    client_legal_area = adv.get("legal_area")
+    client_jurisdiction = adv.get("jurisdiction")
+    client_urgency = case_row.urgency or "medium"
 
     # Extract budget goals if the client provided them at intake
-    budget_goals_data = case_data.get("budget_goals")
+    budget_goals_data = case_row.budget_goals
     budget_goals = None
     if budget_goals_data:
         from models.schemas import BudgetGoals
         budget_goals = BudgetGoals(**budget_goals_data)
 
-    evasive_defendant = case_data.get("evasive_defendant", False)
+    evasive_defendant = adv.get("evasive_defendant", False)
 
     # Build case_meta for jurisdictional alignment scorer
     case_meta = {
         "jurisdiction": client_jurisdiction,
-        "county": case_data.get("county"),
-        "plaintiff_location": case_data.get("plaintiff_location"),
-        "defendant_location": case_data.get("defendant_location"),
-        "federal_question": case_data.get("federal_question"),
-        "procedural_flags": case_data.get("procedural_flags"),
-        "subject_matter_jurisdiction": case_data.get("subject_matter_jurisdiction"),
-        "personal_jurisdiction_basis": case_data.get("personal_jurisdiction_basis"),
-        "procedural_posture": case_data.get("procedural_posture"),
-        "primary_remedy": case_data.get("primary_remedy"),
+        "county": adv.get("county"),
+        "plaintiff_location": adv.get("plaintiff_location"),
+        "defendant_location": adv.get("defendant_location"),
+        "federal_question": adv.get("federal_question"),
+        "procedural_flags": adv.get("procedural_flags"),
+        "subject_matter_jurisdiction": adv.get("subject_matter_jurisdiction"),
+        "personal_jurisdiction_basis": adv.get("personal_jurisdiction_basis"),
+        "procedural_posture": adv.get("procedural_posture"),
+        "primary_remedy": adv.get("primary_remedy"),
         "evasive_defendant": evasive_defendant,
     }
 
-    logger.info("Starting match pipeline for case %s", body.case_id)
+    log.info("match_pipeline_start", case_id=body.case_id)
 
     # ----- Step 1: Gemini analysis ------------------------------------------
     try:
@@ -101,23 +112,23 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             client_urgency=client_urgency,
         )
     except RuntimeError as exc:
-        logger.error("Gemini analysis failed: %s", exc)
+        log.error("gemini_analysis_failed", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini analysis failed: {exc}",
         )
     except ValueError as exc:
-        logger.error("Gemini output parsing failed: %s", exc)
+        log.error("gemini_output_parse_failed", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Gemini returned invalid output: {exc}",
         )
 
-    logger.info(
-        "Gemini analysis: primary=%s, jurisdiction=%s, issues=%d",
-        analysis.primary_legal_area,
-        analysis.jurisdiction,
-        len(analysis.key_issues),
+    log.info(
+        "gemini_analysis_complete",
+        primary_area=analysis.primary_legal_area,
+        jurisdiction=analysis.jurisdiction,
+        issue_count=len(analysis.key_issues),
     )
 
     # ----- Step 1b: Corporate defendant HQ lookup ---------------------------
@@ -131,25 +142,26 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             corp = await lookup_corporation(corp_names[0])
             if corp and corp.hq_state:
                 corporate_hq_state = corp.hq_state
-                logger.info(
-                    "Corporate HQ resolved: %s -> %s",
-                    corp_names[0], corporate_hq_state,
+                log.info(
+                    "corporate_hq_resolved",
+                    company=corp_names[0],
+                    hq_state=corporate_hq_state,
                 )
     except Exception as exc:
-        logger.warning("Corporate lookup (non-fatal): %s", exc)
+        log.warning("corporate_lookup_failed", error=str(exc))
         warnings.append(f"Corporate defendant lookup unavailable: {exc}")
 
     # ----- Step 1c: Venue recommendation ------------------------------------
     venue_recommendation = None
     try:
         venue_recommendation = await recommend_venue(analysis, description, corporate_hq_state=corporate_hq_state)
-        logger.info(
-            "Venue recommendation: %s (john_doe=%s)",
-            venue_recommendation.recommended_court,
-            venue_recommendation.john_doe_protocol,
+        log.info(
+            "venue_recommendation",
+            court=venue_recommendation.recommended_court,
+            john_doe=venue_recommendation.john_doe_protocol,
         )
     except Exception as exc:
-        logger.warning("Venue optimizer failed (non-fatal): %s", exc)
+        log.warning("venue_optimizer_failed", error=str(exc))
         warnings.append(f"Venue recommendation unavailable: {exc}")
 
     # ----- Step 2: Score and rank attorneys ----------------------------------
@@ -164,7 +176,7 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             evasive_defendant=evasive_defendant,
         )
     except Exception as exc:
-        logger.error("Matching algorithm failed: %s", exc)
+        log.error("matching_algorithm_failed", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Matching algorithm error: {exc}",
@@ -176,7 +188,7 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             "This may indicate a coverage gap in the attorney database."
         )
 
-    logger.info("Matcher returned %d candidates", len(candidates))
+    log.info("matcher_results", candidate_count=len(candidates))
 
     # ----- Step 3: Claude Opus audit ----------------------------------------
     audit = None
@@ -190,10 +202,10 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             )
         except RuntimeError as exc:
             # Audit is non-blocking -- if it fails we still return matches
-            logger.warning("Claude Opus audit failed (non-fatal): %s", exc)
+            log.warning("opus_audit_failed", error=str(exc))
             warnings.append(f"Audit layer unavailable: {exc}")
         except ValueError as exc:
-            logger.warning("Claude Opus audit output invalid (non-fatal): %s", exc)
+            log.warning("opus_audit_output_invalid", error=str(exc))
             warnings.append(f"Audit produced invalid output: {exc}")
 
     # ----- Step 3b: Live court verification (non-blocking) ------------------
@@ -213,26 +225,26 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
             ver_map = {v.attorney_name: v for v in verifications}
             for candidate in candidates:
                 candidate.court_verification = ver_map.get(candidate.attorney.name)
-            logger.info(
-                "Court verification attached to %d candidates",
-                sum(1 for v in verifications if v.records_found > 0),
+            log.info(
+                "court_verification_attached",
+                verified_count=sum(1 for v in verifications if v.records_found > 0),
             )
         except Exception as exc:
-            logger.warning("Live court verification unavailable (non-fatal): %s", exc)
+            log.warning("court_verification_unavailable", error=str(exc))
             warnings.append(f"Live court verification unavailable: {exc}")
 
     # ----- Step 4: Assemble response ----------------------------------------
     elapsed_ms = int((time.monotonic() - start) * 1000)
 
-    logger.info(
-        "Pipeline complete for case %s in %d ms (matches=%d, audited=%s)",
-        body.case_id,
-        elapsed_ms,
-        len(candidates),
-        audit is not None,
+    log.info(
+        "pipeline_complete",
+        case_id=body.case_id,
+        duration_ms=elapsed_ms,
+        match_count=len(candidates),
+        audited=audit is not None,
     )
 
-    return MatchResponse(
+    response = MatchResponse(
         case_id=body.case_id,
         gemini_analysis=analysis,
         matches=candidates,
@@ -241,3 +253,80 @@ async def run_match_pipeline(body: MatchRequest) -> MatchResponse:
         warnings=warnings,
         venue_recommendation=venue_recommendation,
     )
+
+    # ----- Step 5: Persist match results ------------------------------------
+    try:
+        match_row = MatchResultRow(
+            case_id=body.case_id,
+            matches=[m.model_dump(mode="json") for m in candidates],
+            audit=audit,
+            venue_recommendation=(
+                venue_recommendation.model_dump(mode="json")
+                if venue_recommendation else None
+            ),
+        )
+        db.add(match_row)
+        await db.commit()
+    except Exception as exc:
+        log.warning("match_persist_failed", error=str(exc))
+
+    # ----- Step 6: Email notifications & lead creation (best-effort) --------
+    try:
+        from services.email import send_matches_ready, send_lead_to_attorney
+
+        # Notify client that matches are ready
+        client_email = getattr(case_row, "client_email", None) or ""
+        if client_email and candidates:
+            asyncio.create_task(send_matches_ready(
+                to_email=client_email,
+                case_id=body.case_id,
+                match_count=len(candidates),
+            ))
+
+        # Create Lead rows for top 3 matched attorneys (if they are registered)
+        # and send lead notification emails
+        practice_area = analysis.primary_legal_area
+        jurisdiction = analysis.jurisdiction
+        top_names = [c.attorney.name for c in candidates[:3]]
+
+        if top_names:
+            result = await db.execute(
+                select(AttorneyRegistered).where(
+                    AttorneyRegistered.name.in_(top_names),
+                    AttorneyRegistered.accepting_clients == "true",
+                )
+            )
+            registered = result.scalars().all()
+
+            for atty in registered:
+                lead = Lead(
+                    case_id=body.case_id,
+                    attorney_id=atty.id,
+                    status="sent",
+                    case_summary={
+                        "practice_area": practice_area,
+                        "urgency": client_urgency,
+                        "jurisdiction": jurisdiction,
+                    },
+                )
+                db.add(lead)
+                # Fire-and-forget email to attorney
+                asyncio.create_task(send_lead_to_attorney(
+                    attorney_email=atty.email,
+                    attorney_name=atty.name,
+                    practice_area=practice_area,
+                    urgency=client_urgency,
+                    jurisdiction=jurisdiction,
+                ))
+
+            if registered:
+                await db.commit()
+                log.info(
+                    "leads_created",
+                    case_id=body.case_id,
+                    lead_count=len(registered),
+                )
+    except Exception as exc:
+        log.warning("email_lead_creation_failed", error=str(exc))
+
+    return response

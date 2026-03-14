@@ -13,6 +13,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "find", label: "Find Attorneys" },
   { key: "roster", label: "Browse Roster" },
   { key: "leaderboard", label: "Rankings" },
+  { key: "attorney", label: "For Attorneys" },
 ];
 
 export default function Header({ health, activeTab, onTabChange }: HeaderProps) {
@@ -23,7 +24,7 @@ export default function Header({ health, activeTab, onTabChange }: HeaderProps) 
           {/* Brand */}
           <div className="flex items-center gap-2.5">
             <Scale className="h-6 w-6 text-[#FCAA2D]" strokeWidth={1.8} />
-            <span className="text-lg font-semibold tracking-tight text-[#191918]">
+            <span className="text-base sm:text-lg font-semibold tracking-tight text-[#191918]">
               Attorney Matchmaker
             </span>
           </div>
@@ -50,12 +51,12 @@ export default function Header({ health, activeTab, onTabChange }: HeaderProps) 
         </div>
 
         {/* Mobile tabs */}
-        <div className="sm:hidden flex gap-1 pb-3">
+        <div className="sm:hidden flex gap-1 pb-3 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => onTabChange(t.key)}
-              className={`flex-1 px-3 py-2 font-mono text-[0.68rem] uppercase tracking-wide transition-colors ${
+              className={`flex-1 px-2 py-2 min-h-[44px] font-mono text-[0.65rem] uppercase tracking-wide transition-colors whitespace-nowrap ${
                 activeTab === t.key
                   ? "border-b-2 border-[#FCAA2D] text-[#191918]"
                   : "text-[rgba(25,25,24,0.45)] hover:text-[#191918]"

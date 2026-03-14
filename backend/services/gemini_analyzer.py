@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
-import logging
 import os
+
+import structlog
 from typing import Any
 
 from google import genai
@@ -25,7 +26,7 @@ from google.genai import types
 
 from models.schemas import CourtListenerKeywords, GeminiAnalysis
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -122,7 +123,7 @@ async def analyze_case(
         description, client_legal_area, client_jurisdiction, client_urgency
     )
 
-    logger.info("Sending case facts to Gemini for analysis (%d chars)", len(description))
+    log.info("Sending case facts to Gemini for analysis (%d chars)", len(description))
 
     try:
         response = await asyncio.wait_for(
@@ -143,12 +144,12 @@ async def analyze_case(
             timeout=30.0,
         )
     except Exception as exc:
-        logger.error("Gemini API call failed: %s", exc)
+        log.error("Gemini API call failed: %s", exc)
         raise RuntimeError(f"Gemini API error: {exc}") from exc
 
     # --- Parse the response ------------------------------------------------
     raw_text = response.text.strip()
-    logger.debug("Gemini raw response: %s", raw_text[:500])
+    log.debug("Gemini raw response: %s", raw_text[:500])
 
     parsed = _extract_json(raw_text)
     if parsed is None:
@@ -170,10 +171,10 @@ async def analyze_case(
             )},
         )
     except Exception as exc:
-        logger.error("Schema validation failed for Gemini output: %s", exc)
+        log.error("Schema validation failed for Gemini output: %s", exc)
         raise ValueError(f"Gemini output failed schema validation: {exc}") from exc
 
-    logger.info(
+    log.info(
         "Gemini analysis complete: primary_area=%s, jurisdiction=%s, issues=%d",
         analysis.primary_legal_area,
         analysis.jurisdiction,
@@ -205,7 +206,7 @@ def _extract_json(text: str) -> dict[str, Any] | None:
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.warning("Primary JSON parse failed, attempting bracket extraction")
+        log.warning("Primary JSON parse failed, attempting bracket extraction")
 
     # Last resort: find the first { ... } block
     start = cleaned.find("{")
@@ -340,7 +341,7 @@ async def extract_search_keywords(
                 target_court_ids=parsed.get("target_court_ids", ["cacd", "cand"]),
             )
     except Exception as exc:
-        logger.warning("Keyword extraction failed, using defaults: %s", exc)
+        log.warning("Keyword extraction failed, using defaults: %s", exc)
 
     return _default_keywords(analysis)
 
@@ -377,7 +378,7 @@ async def refine_facts(facts: str) -> list[str]:
     try:
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
-            logger.warning("GEMINI_API_KEY not set; skipping fact refinement")
+            log.warning("GEMINI_API_KEY not set; skipping fact refinement")
             return []
 
         client = genai.Client(api_key=api_key)
@@ -409,5 +410,5 @@ async def refine_facts(facts: str) -> list[str]:
             return [str(q) for q in questions if q]
         return []
     except Exception as exc:
-        logger.warning("refine_facts failed: %s", exc)
+        log.warning("refine_facts failed: %s", exc)
         return []

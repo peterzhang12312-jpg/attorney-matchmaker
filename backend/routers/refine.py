@@ -7,13 +7,13 @@ to extract missing legal nuances before final intake submission.
 
 from __future__ import annotations
 
-import logging
-
-from fastapi import APIRouter
+import structlog
+from fastapi import APIRouter, Request
+from middleware.rate_limit import limiter
 from models.schemas import RefineFactsRequest, RefineFactsResponse
 from services.gemini_analyzer import refine_facts
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["Fact Refinement"])
 
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api", tags=["Fact Refinement"])
     response_model=RefineFactsResponse,
     summary="Generate follow-up questions for case fact refinement",
 )
-async def refine_facts_endpoint(request: RefineFactsRequest) -> RefineFactsResponse:
+@limiter.limit("20/minute")
+async def refine_facts_endpoint(request: Request, body: RefineFactsRequest) -> RefineFactsResponse:
     """
     Analyze submitted case facts and return 2-3 targeted follow-up questions
     to extract missing legal nuances (procedural posture, jurisdiction triggers,
@@ -32,6 +33,6 @@ async def refine_facts_endpoint(request: RefineFactsRequest) -> RefineFactsRespo
     This endpoint is stateless -- no case_id required. The caller is responsible
     for appending answers to the final fact description before calling /api/intake.
     """
-    logger.info("refine-facts: %d chars submitted", len(request.facts))
-    questions = await refine_facts(request.facts)
+    log.info("refine_facts_request", chars=len(body.facts))
+    questions = await refine_facts(body.facts)
     return RefineFactsResponse(questions=questions)

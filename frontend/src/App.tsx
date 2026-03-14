@@ -10,13 +10,18 @@ import AuditSummary from "./components/AuditSummary";
 import RosterView from "./components/RosterView";
 import LeaderboardView from "./components/LeaderboardView";
 import HeroSection from "./components/HeroSection";
+import AttorneyOnboard from "./components/AttorneyOnboard";
+import AttorneyDashboard from "./components/AttorneyDashboard";
 
-export type Tab = "find" | "roster" | "leaderboard";
+export type Tab = "find" | "roster" | "leaderboard" | "attorney";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("find");
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [matchResult, setMatchResult] = useState<MatchResponse | null>(null);
+  const [attorneyToken, setAttorneyToken] = useState<string | null>(
+    localStorage.getItem("attorney_token"),
+  );
 
   /* Poll health on mount */
   useEffect(() => {
@@ -39,6 +44,19 @@ export default function App() {
 
   const handleReset = useCallback(() => {
     setMatchResult(null);
+  }, []);
+
+  const handleAttorneySuccess = useCallback(
+    (token: string, _name: string, _isFounding: boolean) => {
+      setAttorneyToken(token);
+      localStorage.setItem("attorney_token", token);
+    },
+    [],
+  );
+
+  const handleAttorneySignOut = useCallback(() => {
+    setAttorneyToken(null);
+    localStorage.removeItem("attorney_token");
   }, []);
 
   return (
@@ -103,6 +121,20 @@ export default function App() {
       {activeTab === "leaderboard" && (
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <LeaderboardView />
+        </main>
+      )}
+
+      {/* Attorney portal tab */}
+      {activeTab === "attorney" && (
+        <main className="flex-1">
+          {attorneyToken ? (
+            <AttorneyDashboard
+              token={attorneyToken}
+              onSignOut={handleAttorneySignOut}
+            />
+          ) : (
+            <AttorneyOnboard onSuccess={handleAttorneySuccess} />
+          )}
         </main>
       )}
     </div>

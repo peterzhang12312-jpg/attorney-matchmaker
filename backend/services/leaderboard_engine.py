@@ -11,8 +11,9 @@ Caches results for 60 minutes to avoid repeated CL API calls.
 
 from __future__ import annotations
 
-import logging
 import time
+
+import structlog
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -27,7 +28,7 @@ from services.courtlistener_client import (
 )
 from data.attorneys import get_all_attorneys
 
-logger = logging.getLogger(__name__)
+log = structlog.get_log()
 
 # ---------------------------------------------------------------------------
 # Domain query map
@@ -80,7 +81,7 @@ def _cache_get(domain: str, jurisdiction: str) -> Optional[LeaderboardResponse]:
     if key in _cache:
         ts, resp = _cache[key]
         if time.monotonic() - ts < _CACHE_TTL:
-            logger.info("Leaderboard cache hit: %s", key)
+            log.info("Leaderboard cache hit: %s", key)
             return resp
         del _cache[key]
     return None
@@ -108,7 +109,7 @@ async def _build_cl_pool(
     try:
         hdrs = _headers()
     except RuntimeError:
-        logger.warning("CourtListener token missing; skipping CL pool for leaderboard")
+        log.warning("CourtListener token missing; skipping CL pool for leaderboard")
         return []
 
     # attorney_id -> (profile, set_of_docket_ids)
@@ -119,7 +120,7 @@ async def _build_cl_pool(
             try:
                 results = await _search_dockets(client, query, court_ids, max_results=25)
             except Exception as exc:
-                logger.warning("CL leaderboard search failed for %r: %s", query, exc)
+                log.warning("CL leaderboard search failed for %r: %s", query, exc)
                 continue
 
             for result in results:
@@ -269,7 +270,7 @@ async def get_leaderboard(
             from services.claude_auditor import audit_leaderboard
             audit = await audit_leaderboard(domain, entries[:5])
         except Exception as exc:
-            logger.warning("Leaderboard audit failed: %s", exc)
+            log.warning("Leaderboard audit failed: %s", exc)
 
     resp = LeaderboardResponse(
         domain=domain,

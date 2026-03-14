@@ -44,7 +44,7 @@ export default function StepProgressBar({ currentStep, steps = DEFAULT_STEPS }: 
                 )}
               </div>
               <span
-                className={`mt-1.5 text-xs font-medium ${
+                className={`mt-1.5 text-xs font-medium hidden sm:block ${
                   isActive
                     ? "text-[#FCAA2D]"
                     : isCompleted
@@ -59,7 +59,7 @@ export default function StepProgressBar({ currentStep, steps = DEFAULT_STEPS }: 
             {/* Connector line (not after last step) */}
             {idx < steps.length - 1 && (
               <div
-                className={`w-10 sm:w-16 h-0.5 mx-2 mb-5 transition-colors ${
+                className={`w-6 sm:w-16 h-0.5 mx-1 sm:mx-2 mb-0 sm:mb-5 transition-colors ${
                   currentStep > step.number
                     ? "bg-[#FCAA2D]"
                     : "bg-[rgba(25,25,24,0.12)]"
