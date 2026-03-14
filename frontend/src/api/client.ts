@@ -13,6 +13,10 @@ import type {
   RefineFactsRequest,
   RefineFactsResponse,
   LeaderboardResponse,
+  AttorneyRegisterRequest,
+  AttorneyLoginResponse,
+  AttorneyProfile,
+  LeadSummary,
 } from "../types/api";
 
 class ApiError extends Error {
@@ -129,4 +133,62 @@ export async function fetchLeaderboard(params?: {
   const qs = searchParams.toString();
   const url = qs ? `/api/leaderboard?${qs}` : "/api/leaderboard";
   return request<LeaderboardResponse>(url);
+}
+
+/* ---------- Attorney Onboarding ---------- */
+
+export async function registerAttorney(
+  data: AttorneyRegisterRequest,
+): Promise<AttorneyLoginResponse> {
+  return request<AttorneyLoginResponse>("/api/attorney/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function loginAttorney(
+  email: string,
+  password: string,
+): Promise<AttorneyLoginResponse> {
+  return request<AttorneyLoginResponse>("/api/attorney/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function getAttorneyProfile(
+  token: string,
+): Promise<AttorneyProfile> {
+  return request<AttorneyProfile>("/api/attorney/profile", {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function getAttorneyLeads(
+  token: string,
+): Promise<LeadSummary[]> {
+  return request<LeadSummary[]>("/api/attorney/leads", {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function respondToLead(
+  token: string,
+  leadId: string,
+  action: "accept" | "decline",
+): Promise<void> {
+  await request<void>(`/api/attorney/leads/${leadId}/respond`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action }),
+  });
 }

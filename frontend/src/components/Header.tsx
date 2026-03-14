@@ -13,6 +13,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: "find", label: "Find Attorneys" },
   { key: "roster", label: "Browse Roster" },
   { key: "leaderboard", label: "Rankings" },
+  { key: "attorney", label: "For Attorneys" },
 ];
 
 export default function Header({ health, activeTab, onTabChange }: HeaderProps) {

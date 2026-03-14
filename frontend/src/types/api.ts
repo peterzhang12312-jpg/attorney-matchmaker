@@ -231,3 +231,51 @@ export interface AttorneyListResponse {
   attorneys: Attorney[];
   total: number;
 }
+
+/* ---------- Attorney Onboarding ---------- */
+
+export interface AttorneyRegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  bar_number?: string;
+  firm?: string;
+  jurisdictions?: string[];
+  practice_areas?: string[];
+  hourly_rate?: string;
+  availability?: string;
+  accepting_clients?: boolean;
+}
+
+export interface AttorneyLoginResponse {
+  token: string;
+  attorney_id: string;
+  name: string;
+  is_founding: boolean;
+}
+
+export interface AttorneyProfile {
+  id: string;
+  name: string;
+  email: string;
+  bar_number?: string;
+  firm?: string;
+  jurisdictions?: string[];
+  practice_areas?: string[];
+  hourly_rate?: string;
+  availability: string;
+  accepting_clients: boolean;
+  is_founding: boolean;
+  created_at?: string;
+}
+
+export interface LeadSummary {
+  id: string;
+  case_id: string;
+  status: string;
+  practice_area?: string;
+  urgency?: string;
+  jurisdiction?: string;
+  sent_at?: string;
+  responded_at?: string;
+}
