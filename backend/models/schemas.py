@@ -345,8 +345,8 @@ class ScoreBreakdown(BaseModel):
 
 
 class CourtRecord(BaseModel):
-    """A single case record found via live court verification (NYSCEF or PACER PCL)."""
-    source: str                           # "pacer_pcl" | "nyscef"
+    """A single case record found via live court verification."""
+    source: str                           # "courtlistener" | "pacer_pcl"
     case_name: str
     docket_number: str
     court: str
@@ -362,8 +362,10 @@ class CourtVerificationResult(BaseModel):
     attorney_name: str
     records_found: int
     court_records: list[CourtRecord] = []
-    source: str                           # "pacer_pcl" | "nyscef" | "none"
+    source: str                           # "courtlistener" | "pacer_pcl" | "none"
     error: Optional[str] = None
+    verification_url: Optional[str] = None  # NYSCEF manual search URL
+    checked_at: Optional[str] = None        # ISO 8601 timestamp
 
 
 class MatchCandidate(BaseModel):

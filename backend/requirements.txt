@@ -5,7 +5,7 @@ anthropic
 python-dotenv
 pydantic
 httpx
-playwright
+
 aiofiles
 sqlalchemy>=2.0.0
 asyncpg>=0.29.0

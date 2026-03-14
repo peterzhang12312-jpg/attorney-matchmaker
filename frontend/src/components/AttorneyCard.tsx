@@ -8,6 +8,7 @@ import {
   Quote,
   Scale,
   ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 import type {
   MatchEntry,
@@ -217,6 +218,17 @@ function LiveVerificationSection({ cv }: { cv: CourtVerificationResult }) {
         {cv.error && (
           <p className="text-[10px] text-red-400 mt-1">{cv.error}</p>
         )}
+        {cv.verification_url && (
+          <a
+            href={cv.verification_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide hover:bg-amber-400 transition-colors"
+          >
+            Verify on NYSCEF
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
     );
   }
@@ -259,6 +271,18 @@ function LiveVerificationSection({ cv }: { cv: CourtVerificationResult }) {
           </div>
         ))}
       </div>
+
+      {cv.verification_url && (
+        <a
+          href={cv.verification_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide hover:bg-amber-400 transition-colors"
+        >
+          Verify on NYSCEF
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
     </div>
   );
 }

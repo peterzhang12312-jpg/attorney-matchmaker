@@ -1,12 +1,12 @@
 """
-Court Navigator — live court filing verification.
+Court Navigator -- live court filing verification.
 
 Two data sources:
-  1. NYSCEF (New York State Courts Electronic Filing System) via Playwright
-     headless browser (guest-only access, no document downloads).
-  2. PACER Case Locator (PCL) REST API — official ToS-compliant public index.
+  1. CourtListener docket search (quick attorney name lookup via REST API).
+  2. PACER Case Locator (PCL) REST API -- official ToS-compliant public index.
 
-# NOTE: NYSCEF automation policy unconfirmed. Guest-only. No document downloads.
+For NY state courts, generates a NYSCEF manual search URL so the user can
+verify directly in their browser (no headless automation).
 
 Usage
 -----
@@ -18,129 +18,134 @@ from __future__ import annotations
 
 import asyncio
 import os
-
-import structlog
+from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
+import structlog
 
 from models.schemas import CourtRecord, CourtVerificationResult
 
-log = structlog.get_log()
+log = structlog.get_logger()
+
+# CourtListener base URL (same as courtlistener_client.py)
+_CL_BASE = "https://www.courtlistener.com/api/rest/v4"
 
 # PACER Case Locator endpoints
 _PCL_LOGIN = "https://pacer.uscourts.gov/pcl-public-api/rest/login"
-_PCL_FIND  = "https://pacer.uscourts.gov/pcl-public-api/rest/cases/find"
+_PCL_FIND = "https://pacer.uscourts.gov/pcl-public-api/rest/cases/find"
 
-# NYSCEF guest search URL
-_NYSCEF_SEARCH = "https://iapps.courts.state.ny.us/nyscef/Search"
+# NYSCEF guest search URL template
+_NYSCEF_SEARCH = "https://iapps.courts.state.ny.us/nyscef/CaseSearch"
 
 # Court ID sets
-_NY_COURTS     = {"nyed", "nysd", "nysupct", "ny"}
+_NY_COURTS = {"nyed", "nysd", "nysupct", "ny"}
 _FEDERAL_COURTS = {"nyed", "nysd", "cacd", "cand"}
 
 
+def _cl_headers() -> dict[str, str]:
+    """Build CourtListener auth headers."""
+    token = os.getenv("COURTLISTENER_API_TOKEN", "").strip()
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Token {token}"
+    return headers
+
+
+def _build_nyscef_url(attorney_name: str) -> str:
+    """
+    Build a NYSCEF CaseSearch URL pre-filled with the attorney's name.
+
+    Splits on the last space to get first/last name components.
+    """
+    parts = attorney_name.strip().split()
+    if len(parts) >= 2:
+        first_name = " ".join(parts[:-1])
+        last_name = parts[-1]
+    else:
+        first_name = ""
+        last_name = attorney_name.strip()
+
+    return (
+        f"{_NYSCEF_SEARCH}"
+        f"?param=T"
+        f"&lastName={quote(last_name)}"
+        f"&firstName={quote(first_name)}"
+    )
+
+
 # ---------------------------------------------------------------------------
-# NYSCEF (Playwright headless browser)
+# CourtListener attorney name search
 # ---------------------------------------------------------------------------
 
-async def search_nyscef_guest(
-    party_name: Optional[str],
-    county: Optional[str] = None,
-    keywords: Optional[list[str]] = None,
+async def _search_courtlistener(
+    attorney_name: str,
+    court_ids: Optional[list[str]] = None,
 ) -> list[CourtRecord]:
     """
-    Search NYSCEF as a guest user via Playwright headless browser.
+    Quick CourtListener docket search by attorney name.
 
-    # NOTE: NYSCEF automation policy unconfirmed. Guest-only. No document downloads.
-
-    Returns up to 10 CourtRecord objects. Silently returns [] on any failure.
+    Uses the /dockets/ endpoint with attorney name filtering.
+    Timeout is 3s to keep the pipeline fast.
+    Returns up to 5 CourtRecord objects. Returns [] on any failure.
     """
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        log.warning("Playwright not installed -- NYSCEF search unavailable. "
-                       "Run: pip install playwright && playwright install chromium")
-        return []
+    headers = _cl_headers()
 
-    search_term = party_name or (" ".join(keywords) if keywords else None)
-    if not search_term:
-        return []
+    params: dict[str, str] = {
+        "type": "1",  # civil dockets
+        "order_by": "-date_filed",
+        "page_size": "5",
+    }
+
+    # Filter by attorney name in the search query
+    params["q"] = f'attorney:"{attorney_name}"'
+
+    if court_ids:
+        params["court"] = ",".join(court_ids)
 
     records: list[CourtRecord] = []
 
     try:
-        async with async_playwright() as pw:
-            browser = await pw.chromium.launch(headless=True)
-            try:
-                page = await browser.new_page()
-
-                await page.goto(_NYSCEF_SEARCH, timeout=15000)
-
-                # Locate party name / search input (NYSCEF varies by version)
-                party_input = page.locator(
-                    "input[name*='party'], input[id*='party'], "
-                    "input[placeholder*='Party'], input[placeholder*='party']"
-                )
-                if await party_input.count() > 0:
-                    await party_input.first.fill(search_term)
-                else:
-                    text_inputs = page.locator("input[type='text']")
-                    if await text_inputs.count() > 0:
-                        await text_inputs.first.fill(search_term)
-                    else:
-                        log.debug("NYSCEF: no suitable input field found")
-                        return []
-
-                # Submit
-                submit_btn = page.locator(
-                    "input[type='submit'], button[type='submit']"
-                )
-                if await submit_btn.count() > 0:
-                    await submit_btn.first.click()
-                    await page.wait_for_load_state("networkidle", timeout=15000)
-
-                # Parse results table — skip header row (index 0)
-                rows = page.locator("table tr")
-                row_count = await rows.count()
-
-                for i in range(1, min(row_count, 11)):
-                    row = rows.nth(i)
-                    cells = row.locator("td")
-                    cell_count = await cells.count()
-                    if cell_count < 2:
-                        continue
-                    try:
-                        texts = [
-                            (await cells.nth(j).inner_text()).strip()
-                            for j in range(cell_count)
-                        ]
-                        records.append(CourtRecord(
-                            source="nyscef",
-                            case_name=texts[0] if texts else "Unknown",
-                            docket_number=texts[1] if len(texts) > 1 else "",
-                            court=county or "New York Supreme Court",
-                            date_filed=texts[2] if len(texts) > 2 else None,
-                            parties=[party_name] if party_name else [],
-                            attorney_name=None,
-                            motions_detected=[],
-                            verified=True,
-                        ))
-                    except Exception as row_exc:
-                        log.debug("NYSCEF row %d parse error: %s", i, row_exc)
-            finally:
-                await browser.close()
-
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{_CL_BASE}/dockets/",
+                params=params,
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.TimeoutException:
+        log.warning("courtlistener_timeout", attorney=attorney_name)
+        return []
     except Exception as exc:
-        log.debug("NYSCEF search failed (non-fatal): %s", exc)
+        log.warning("courtlistener_search_failed", attorney=attorney_name, error=str(exc))
         return []
 
-    log.info("NYSCEF: %d records found (county=%s)", len(records), county)
-    return records[:10]
+    results = data.get("results", [])
+    for docket in results[:5]:
+        try:
+            records.append(CourtRecord(
+                source="courtlistener",
+                case_name=docket.get("case_name") or "Unknown",
+                docket_number=docket.get("docket_number") or "",
+                court=docket.get("court") or "",
+                date_filed=docket.get("date_filed"),
+            ))
+        except Exception as exc:
+            log.debug("cl_docket_parse_error", error=str(exc))
+
+    log.info(
+        "courtlistener_verification",
+        attorney=attorney_name,
+        records_found=len(records),
+        courts=court_ids,
+    )
+    return records
 
 
 # ---------------------------------------------------------------------------
-# PACER Case Locator (REST API — ToS-compliant)
+# PACER Case Locator (REST API -- ToS-compliant)
 # ---------------------------------------------------------------------------
 
 async def _pcl_login(client: httpx.AsyncClient) -> Optional[str]:
@@ -156,7 +161,6 @@ async def _pcl_login(client: httpx.AsyncClient) -> Optional[str]:
             timeout=10.0,
         )
         resp.raise_for_status()
-        # Token may be in header or body
         token = (
             resp.headers.get("X-Auth-Token")
             or resp.json().get("loginResult")
@@ -164,7 +168,7 @@ async def _pcl_login(client: httpx.AsyncClient) -> Optional[str]:
         )
         return token
     except Exception as exc:
-        log.debug("PACER PCL login failed: %s", exc)
+        log.debug("pacer_pcl_login_failed", error=str(exc))
         return None
 
 
@@ -183,21 +187,20 @@ async def search_pacer_pcl(
     Returns [] if PACER_USERNAME is not set in .env.
     """
     if not os.getenv("PACER_USERNAME", "").strip():
-        log.debug("PACER_USERNAME not set -- PCL search skipped")
+        log.debug("pacer_username_not_set")
         return []
 
     fee_protection = os.getenv("PACER_FEE_PROTECTION", "true").lower() == "true"
-    log.debug("PACER PCL fee protection=%s", fee_protection)
+    log.debug("pacer_pcl_fee_protection", enabled=fee_protection)
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         token = await _pcl_login(client)
         if not token:
-            log.warning("PACER PCL: authentication failed -- skipping PCL search")
+            log.warning("pacer_pcl_auth_failed")
             return []
 
         headers = {"X-Auth-Token": token, "Accept": "application/json"}
 
-        # Build search params per PCL API spec
         params: dict = {}
         if party_name:
             parts = party_name.strip().split()
@@ -207,7 +210,7 @@ async def search_pacer_pcl(
             else:
                 params["lastName"] = party_name
         if court_ids:
-            params["courtId"] = court_ids[0]   # PCL: single court per query
+            params["courtId"] = court_ids[0]  # PCL: single court per query
         if nature_of_suit:
             params["natureOfSuit"] = nature_of_suit
 
@@ -221,7 +224,7 @@ async def search_pacer_pcl(
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:
-            log.debug("PACER PCL search failed: %s", exc)
+            log.debug("pacer_pcl_search_failed", error=str(exc))
             return []
 
     cases = data.get("cases") or data.get("results") or []
@@ -243,15 +246,11 @@ async def search_pacer_pcl(
                 ),
                 court=case.get("courtId") or case.get("court") or "",
                 date_filed=case.get("dateFiled") or case.get("date_filed"),
-                parties=[party_name] if party_name else [],
-                attorney_name=None,
-                motions_detected=[],
-                verified=True,
             ))
         except Exception as exc:
-            log.debug("PACER PCL case parse error: %s", exc)
+            log.debug("pacer_pcl_case_parse_error", error=str(exc))
 
-    log.info("PACER PCL: %d records found (courts=%s)", len(records), court_ids)
+    log.info("pacer_pcl_search", records_found=len(records), courts=court_ids)
     return records[:10]
 
 
@@ -264,36 +263,46 @@ async def _verify_single_attorney(
     venue: str,
     evasive_defendant: bool,
 ) -> CourtVerificationResult:
-    """Run NYSCEF and/or PACER PCL searches for one attorney."""
+    """Run CourtListener and/or PACER PCL searches for one attorney."""
     venue_lower = venue.lower()
-    is_ny      = venue_lower in _NY_COURTS or "ny" in venue_lower
+    is_ny = venue_lower in _NY_COURTS or "ny" in venue_lower
     is_federal = venue_lower in _FEDERAL_COURTS
-
-    keywords: Optional[list[str]] = None
-    if evasive_defendant:
-        keywords = [
-            "substituted service",
-            "alternative service",
-            "service by publication",
-        ]
 
     tasks: list = []
     sources: list[str] = []
 
-    if is_ny:
-        tasks.append(search_nyscef_guest(
-            party_name=attorney_name,
-            county=None,
-            keywords=keywords,
-        ))
-        sources.append("nyscef")
+    # CourtListener lookup for any venue (fast, 3s timeout)
+    cl_courts: list[str] = []
+    if is_federal:
+        cl_courts.append(venue_lower)
+    if is_ny and venue_lower in _FEDERAL_COURTS:
+        # Already added above
+        pass
+    elif is_ny:
+        # Search NY federal courts as a proxy (CL has limited state coverage)
+        cl_courts.extend(["nyed", "nysd"])
 
+    if cl_courts:
+        tasks.append(_search_courtlistener(
+            attorney_name=attorney_name,
+            court_ids=cl_courts,
+        ))
+        sources.append("courtlistener")
+
+    # PACER PCL for federal courts
     if is_federal:
         tasks.append(search_pacer_pcl(
             party_name=attorney_name,
-            court_ids=[venue_lower] if venue else None,
+            court_ids=[venue_lower],
         ))
         sources.append("pacer_pcl")
+
+    # Generate NYSCEF manual verification URL for NY venues
+    nyscef_url: Optional[str] = None
+    if is_ny:
+        nyscef_url = _build_nyscef_url(attorney_name)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     if not tasks:
         return CourtVerificationResult(
@@ -301,6 +310,8 @@ async def _verify_single_attorney(
             records_found=0,
             court_records=[],
             source="none",
+            verification_url=nyscef_url,
+            checked_at=now_iso,
         )
 
     try:
@@ -312,6 +323,8 @@ async def _verify_single_attorney(
             court_records=[],
             source="none",
             error=str(exc),
+            verification_url=nyscef_url,
+            checked_at=now_iso,
         )
 
     all_records: list[CourtRecord] = []
@@ -332,6 +345,8 @@ async def _verify_single_attorney(
         court_records=all_records[:10],
         source=", ".join(used_sources) if used_sources else "none",
         error="; ".join(errors) if errors else None,
+        verification_url=nyscef_url,
+        checked_at=now_iso,
     )
 
 
@@ -345,7 +360,10 @@ async def verify_attorneys(
     evasive_defendant: bool = False,
 ) -> list[CourtVerificationResult]:
     """
-    Verify multiple attorneys concurrently via NYSCEF + PACER PCL.
+    Verify multiple attorneys concurrently via CourtListener + PACER PCL.
+
+    For NY venues, each result includes a verification_url pointing to
+    NYSCEF CaseSearch so the user can manually verify state court records.
 
     Parameters
     ----------
@@ -354,13 +372,20 @@ async def verify_attorneys(
     venue : str
         Target court ID (e.g. 'nysd', 'nyed', 'nysupct').
     evasive_defendant : bool
-        When True, injects alternative-service keywords into NYSCEF searches.
+        Passed through for future use; no longer drives NYSCEF automation.
 
     Returns one CourtVerificationResult per attorney.
-    Total hard timeout: 20 seconds.
+    Total hard timeout: 10 seconds (down from 20s with Playwright).
     """
     if not attorney_names:
         return []
+
+    log.info(
+        "court_verification_started",
+        attorney_count=len(attorney_names),
+        venue=venue,
+        evasive_defendant=evasive_defendant,
+    )
 
     tasks = [
         _verify_single_attorney(name, venue, evasive_defendant)
@@ -370,10 +395,12 @@ async def verify_attorneys(
     try:
         results = await asyncio.wait_for(
             asyncio.gather(*tasks, return_exceptions=True),
-            timeout=20.0,
+            timeout=10.0,
         )
     except asyncio.TimeoutError:
-        log.warning("Court verification timed out after 20s")
+        log.warning("court_verification_timeout", timeout_s=10)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        is_ny = venue.lower() in _NY_COURTS or "ny" in venue.lower()
         return [
             CourtVerificationResult(
                 attorney_name=name,
@@ -381,11 +408,16 @@ async def verify_attorneys(
                 court_records=[],
                 source="none",
                 error="Verification timed out",
+                verification_url=_build_nyscef_url(name) if is_ny else None,
+                checked_at=now_iso,
             )
             for name in attorney_names
         ]
 
     final: list[CourtVerificationResult] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+    is_ny = venue.lower() in _NY_COURTS or "ny" in venue.lower()
+
     for name, result in zip(attorney_names, results):
         if isinstance(result, Exception):
             final.append(CourtVerificationResult(
@@ -394,13 +426,15 @@ async def verify_attorneys(
                 court_records=[],
                 source="none",
                 error=str(result),
+                verification_url=_build_nyscef_url(name) if is_ny else None,
+                checked_at=now_iso,
             ))
         else:
             final.append(result)
 
     log.info(
-        "Court verification complete: %d attorneys, %d with records",
-        len(final),
-        sum(1 for r in final if r.records_found > 0),
+        "court_verification_complete",
+        attorney_count=len(final),
+        verified_count=sum(1 for r in final if r.records_found > 0),
     )
     return final

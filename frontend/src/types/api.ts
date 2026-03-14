@@ -133,7 +133,7 @@ export interface ScoreBreakdown {
 }
 
 export interface CourtRecord {
-  source: "pacer_pcl" | "nyscef";
+  source: "courtlistener" | "pacer_pcl";
   case_name: string;
   docket_number: string;
   court: string;
@@ -150,6 +150,8 @@ export interface CourtVerificationResult {
   court_records: CourtRecord[];
   source: string;
   error: string | null;
+  verification_url: string | null;
+  checked_at: string | null;
 }
 
 export interface MatchEntry {
