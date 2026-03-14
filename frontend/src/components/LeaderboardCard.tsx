@@ -37,7 +37,7 @@ export default function LeaderboardCard({ entry, isTopPick = false }: Leaderboar
     <div className={`bg-white rounded-2xl border border-[rgba(25,25,24,0.12)] hover:border-[rgba(25,25,24,0.22)] transition-colors p-5 ${
       isTopPick ? "ring-2 ring-[rgba(252,170,45,0.4)]" : ""
     }`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3 mb-3">
         <div className="flex items-start gap-3 min-w-0">
           {/* Rank badge */}
           <span className={`shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-full border text-xs font-bold ${rankClass}`}>
@@ -70,7 +70,7 @@ export default function LeaderboardCard({ entry, isTopPick = false }: Leaderboar
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center gap-4 text-[11px] text-gray-500 mb-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500 mb-3">
         <span className="flex items-center gap-1">
           <Briefcase className="h-3 w-3" />
           {stats.docket_count} docket{stats.docket_count !== 1 ? "s" : ""}

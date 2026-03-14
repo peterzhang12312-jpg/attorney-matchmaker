@@ -14,7 +14,7 @@ export default function VenueRecommendationCard({
   return (
     <div className="rounded-xl bg-white border border-[rgba(25,25,24,0.12)] overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 border-b border-[rgba(25,25,24,0.06)]">
+      <div className="px-4 sm:px-5 pt-5 pb-3 border-b border-[rgba(25,25,24,0.06)]">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-[#FCAA2D]" />
           <span className="font-mono text-[0.68rem] uppercase tracking-widest text-[#FCAA2D]">
@@ -23,10 +23,10 @@ export default function VenueRecommendationCard({
         </div>
       </div>
 
-      <div className="px-5 py-4 space-y-4">
+      <div className="px-4 sm:px-5 py-4 space-y-4">
         {/* Primary recommendation */}
         <div>
-          <p className="text-lg font-bold text-gray-900">
+          <p className="text-lg font-bold text-gray-900 break-words">
             {recommendation.recommended_court_label}
           </p>
           <p className="mt-1.5 text-sm text-gray-600 leading-relaxed">
@@ -55,7 +55,7 @@ export default function VenueRecommendationCard({
             <button
               type="button"
               onClick={() => setAltOpen(!altOpen)}
-              className="flex items-center gap-1.5 text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
+              className="flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
             >
               {altOpen ? (
                 <ChevronUp className="h-3.5 w-3.5" />

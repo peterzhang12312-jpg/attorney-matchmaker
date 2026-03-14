@@ -22,7 +22,7 @@ export default function HeroSection() {
   return (
     <div className="bg-[#FFFEF2] border-b border-[rgba(25,25,24,0.05)] py-10 text-center animate-fade-in">
       <div className="max-w-2xl mx-auto px-4">
-        <h1 className="text-3xl sm:text-4xl font-bold text-[#191918] leading-tight mb-3">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#191918] leading-tight mb-3">
           Objective{" "}
           <span className="text-[#FCAA2D]">Math.</span>
           <br />
@@ -35,7 +35,7 @@ export default function HeroSection() {
           {" "}— not who paid for top billing.
         </p>
 
-        <div className="flex flex-wrap justify-center gap-3 mb-7">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-7">
           {pills.map(({ icon: Icon, label, description }) => (
             <div
               key={label}

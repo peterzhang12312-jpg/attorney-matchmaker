@@ -53,13 +53,13 @@ export default function LeaderboardView() {
           <h2 className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)]">Attorney Rankings</h2>
         </div>
 
-        <select value={domain} onChange={(e) => setDomain(e.target.value)} className={selectClasses}>
+        <select value={domain} onChange={(e) => setDomain(e.target.value)} className={`${selectClasses} min-h-[44px] w-full sm:w-auto`}>
           {DOMAINS.map((d) => (
             <option key={d.value} value={d.value}>{d.label}</option>
           ))}
         </select>
 
-        <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className={selectClasses}>
+        <select value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} className={`${selectClasses} min-h-[44px] w-full sm:w-auto`}>
           {JURISDICTIONS.map((j) => (
             <option key={j.value} value={j.value}>{j.label}</option>
           ))}
@@ -68,7 +68,7 @@ export default function LeaderboardView() {
         <button
           onClick={load}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-[rgba(25,25,24,0.45)] hover:text-[#191918] bg-white border border-[rgba(25,25,24,0.12)] hover:border-[rgba(25,25,24,0.22)] transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] w-full sm:w-auto rounded-lg text-xs font-medium text-[rgba(25,25,24,0.45)] hover:text-[#191918] bg-white border border-[rgba(25,25,24,0.12)] hover:border-[rgba(25,25,24,0.22)] transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           Refresh

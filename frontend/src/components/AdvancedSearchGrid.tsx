@@ -86,7 +86,7 @@ function GridSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg bg-white border border-[rgba(25,25,24,0.12)] px-3 py-2 text-sm text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#FCAA2D]/30 focus:border-[#FCAA2D] appearance-none"
+        className="w-full rounded-lg bg-white border border-[rgba(25,25,24,0.12)] px-3 py-2 min-h-[44px] text-sm text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#FCAA2D]/30 focus:border-[#FCAA2D] appearance-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -107,7 +107,7 @@ export default function AdvancedSearchGrid({
   onChange,
 }: AdvancedSearchGridProps) {
   return (
-    <div className="rounded-xl border border-[rgba(25,25,24,0.12)] bg-[rgba(252,170,45,0.05)] px-5 py-5 mb-5 space-y-4">
+    <div className="rounded-xl border border-[rgba(25,25,24,0.12)] bg-[rgba(252,170,45,0.05)] px-3 sm:px-5 py-5 mb-5 space-y-4">
       <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-widest text-[rgba(25,25,24,0.45)] mb-1">
         Advanced Strategic Parameters
       </p>

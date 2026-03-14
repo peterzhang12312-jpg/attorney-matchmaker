@@ -146,7 +146,7 @@ function CaseIntelligenceSection({ intel }: { intel: DocketIntelligence }) {
           <button
             type="button"
             onClick={() => setTimelineOpen(!timelineOpen)}
-            className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex items-center gap-1.5 min-h-[44px] text-[10px] font-medium text-gray-400 hover:text-gray-600 transition-colors"
           >
             {timelineOpen ? (
               <ChevronUp className="h-3 w-3" />
@@ -223,7 +223,7 @@ function LiveVerificationSection({ cv }: { cv: CourtVerificationResult }) {
             href={cv.verification_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide hover:bg-amber-400 transition-colors"
+            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 min-h-[44px] rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide hover:bg-amber-400 transition-colors"
           >
             Verify on NYSCEF
             <ExternalLink className="h-3 w-3" />
@@ -305,7 +305,7 @@ export default function AttorneyCard({
 
   return (
     <div className="rounded-xl bg-white border border-[rgba(25,25,24,0.12)] hover:border-[rgba(25,25,24,0.22)] transition-colors overflow-hidden">
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {/* Top row: rank badge + attorney info + composite score */}
         <div className="flex items-start gap-4">
           {/* Rank badge */}
@@ -418,7 +418,7 @@ export default function AttorneyCard({
         <button
           type="button"
           onClick={() => setRationaleOpen(!rationaleOpen)}
-          className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
+          className="mt-3 flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
         >
           {rationaleOpen ? (
             <ChevronUp className="h-3.5 w-3.5" />
@@ -441,7 +441,7 @@ export default function AttorneyCard({
             <button
               type="button"
               onClick={() => setIntelOpen(!intelOpen)}
-              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
+              className="mt-3 flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
             >
               {intelOpen ? (
                 <ChevronUp className="h-3.5 w-3.5" />
@@ -462,7 +462,7 @@ export default function AttorneyCard({
             <button
               type="button"
               onClick={() => setVerifyOpen(!verifyOpen)}
-              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
+              className="mt-3 flex items-center gap-1.5 min-h-[44px] text-xs font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
             >
               {verifyOpen ? (
                 <ChevronUp className="h-3.5 w-3.5" />
