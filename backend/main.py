@@ -29,7 +29,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from middleware.logging_config import setup_logging
 from middleware.rate_limit import limiter
 from models.schemas import ErrorResponse, HealthResponse
-from routers import attorneys, intake, leaderboard, match, refine
+from routers import attorneys, attorney, intake, leaderboard, match, refine
 
 # ---------------------------------------------------------------------------
 # Environment & logging
@@ -153,6 +153,7 @@ app.include_router(match.router)
 app.include_router(attorneys.router)
 app.include_router(refine.router)
 app.include_router(leaderboard.router)
+app.include_router(attorney.router)
 
 # Debug router -- only active when DEBUG=true in .env
 if os.getenv("DEBUG", "").lower() in ("true", "1"):

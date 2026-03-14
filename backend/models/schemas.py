@@ -526,3 +526,79 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     request_id: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Attorney self-onboarding schemas
+# ---------------------------------------------------------------------------
+
+class AttorneyRegisterRequest(BaseModel):
+    """Payload for attorney self-registration."""
+    name: str = Field(..., min_length=1, max_length=200)
+    email: str = Field(..., min_length=5, max_length=254)
+    password: str = Field(..., min_length=8, max_length=128)
+    bar_number: Optional[str] = None
+    firm: Optional[str] = None
+    jurisdictions: Optional[list[str]] = None
+    practice_areas: Optional[list[str]] = None
+    hourly_rate: Optional[str] = None
+    availability: Optional[str] = "available"
+    accepting_clients: Optional[bool] = True
+
+
+class AttorneyProfileUpdate(BaseModel):
+    """Partial update for an attorney's own profile."""
+    bar_number: Optional[str] = None
+    firm: Optional[str] = None
+    jurisdictions: Optional[list[str]] = None
+    practice_areas: Optional[list[str]] = None
+    hourly_rate: Optional[str] = None
+    availability: Optional[str] = None
+    accepting_clients: Optional[bool] = None
+
+
+class AttorneyLoginRequest(BaseModel):
+    """Credentials for attorney login."""
+    email: str
+    password: str
+
+
+class AttorneyLoginResponse(BaseModel):
+    """Returned on successful authentication."""
+    token: str
+    attorney_id: str
+    name: str
+    is_founding: bool
+
+
+class AttorneyProfileResponse(BaseModel):
+    """Public-facing attorney profile (no password hash)."""
+    id: str
+    name: str
+    email: str
+    bar_number: Optional[str]
+    firm: Optional[str]
+    jurisdictions: Optional[list[str]]
+    practice_areas: Optional[list[str]]
+    hourly_rate: Optional[str]
+    availability: str
+    accepting_clients: bool
+    is_founding: bool
+    created_at: Optional[str]
+
+
+class LeadSummary(BaseModel):
+    """A single lead as seen by the receiving attorney (no PII)."""
+    id: str
+    case_id: str
+    status: str
+    practice_area: Optional[str]
+    urgency: Optional[str]
+    jurisdiction: Optional[str]
+    sent_at: Optional[str]
+    responded_at: Optional[str]
+
+
+class LeadRespondRequest(BaseModel):
+    """Attorney's accept/decline action on a lead."""
+    action: str = Field(..., pattern="^(accept|decline)$")
