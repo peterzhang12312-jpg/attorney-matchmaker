@@ -53,7 +53,7 @@ from models.schemas import (
     MotionRecord,
 )
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 _BASE = "https://www.courtlistener.com/api/rest/v4"
 
