@@ -17,6 +17,7 @@ import type {
   AttorneyLoginResponse,
   AttorneyProfile,
   LeadSummary,
+  CaseLookupResponse,
 } from "../types/api";
 
 class ApiError extends Error {
@@ -192,3 +193,15 @@ export async function respondToLead(
     body: JSON.stringify({ action }),
   });
 }
+
+export async function lookupCase(
+  query: string,
+  intakeCaseId?: string,
+): Promise<CaseLookupResponse> {
+  return request<CaseLookupResponse>("/api/case-lookup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, intake_case_id: intakeCaseId ?? null }),
+  });
+}
+

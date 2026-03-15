@@ -6,6 +6,7 @@ import BlogPost from "./pages/BlogPost";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import EULA from "./pages/EULA";
 import CookiePolicy from "./pages/CookiePolicy";
+import CaseLookupPage from "./pages/CaseLookupPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -15,4 +16,5 @@ export const router = createBrowserRouter([
   { path: "/privacy", element: <PrivacyPolicy /> },
   { path: "/eula", element: <EULA /> },
   { path: "/cookie-policy", element: <CookiePolicy /> },
+  { path: "/case-lookup", element: <CaseLookupPage /> },
 ]);

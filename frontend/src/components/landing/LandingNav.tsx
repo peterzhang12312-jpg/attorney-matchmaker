@@ -17,6 +17,9 @@ export default function LandingNav() {
           <Link to="/blog" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
             Blog
           </Link>
+          <Link to="/case-lookup" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
+            Case Lookup
+          </Link>
         </div>
         <Link
           to="/app"

@@ -279,3 +279,56 @@ export interface LeadSummary {
   sent_at?: string;
   responded_at?: string;
 }
+
+// Case Lookup types
+export interface TimelineEntry {
+  date?: string;
+  description: string;
+  motion_type?: string;
+  motion_label?: string;
+  plain_english?: string;
+}
+
+export interface AttorneyExpectation {
+  estimated_timeline: string;
+  likely_strategy: string;
+  typical_outcomes: string;
+  budget_estimate: string;
+  risk_flags: string[];
+}
+
+export interface SimilarityAnalysis {
+  score: number;
+  matching_elements: string[];
+  key_differences: string[];
+  recommendation: string;
+}
+
+export interface CaseMeta {
+  name: string;
+  docket_number?: string;
+  court: string;
+  date_filed?: string;
+  judge?: string;
+  cl_url?: string;
+  outcome_tag?: string;
+}
+
+export interface CaseLookupAttorney {
+  name: string;
+  firm?: string;
+  role: string;
+  timeline: TimelineEntry[];
+  expectation?: AttorneyExpectation;
+  opposing_counsel_warning?: string;
+}
+
+export interface CaseLookupResponse {
+  query_type: string;
+  case: CaseMeta;
+  attorneys: CaseLookupAttorney[];
+  case_summary?: string;
+  similarity?: SimilarityAnalysis;
+  extracted_practice_area: string;
+  extracted_venue: string;
+}

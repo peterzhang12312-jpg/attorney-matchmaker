@@ -603,3 +603,65 @@ class LeadSummary(BaseModel):
 class LeadRespondRequest(BaseModel):
     """Attorney's accept/decline action on a lead."""
     action: str = Field(..., pattern="^(accept|decline)$")
+
+
+# ---------------------------------------------------------------------------
+# Case Lookup schemas
+# ---------------------------------------------------------------------------
+
+class TimelineEntry(BaseModel):
+    date: Optional[str] = None
+    description: str
+    motion_type: Optional[str] = None      # tro | msj | mtd | osc | alt_service
+    motion_label: Optional[str] = None
+    plain_english: Optional[str] = None
+
+
+class AttorneyExpectation(BaseModel):
+    estimated_timeline: str
+    likely_strategy: str
+    typical_outcomes: str
+    budget_estimate: str
+    risk_flags: list[str] = []
+
+
+class SimilarityAnalysis(BaseModel):
+    score: int                              # 0-100
+    matching_elements: list[str] = []
+    key_differences: list[str] = []
+    recommendation: str
+
+
+class CaseMeta(BaseModel):
+    name: str
+    docket_number: Optional[str] = None
+    court: str
+    date_filed: Optional[str] = None
+    judge: Optional[str] = None
+    cl_url: Optional[str] = None
+    outcome_tag: Optional[str] = None      # Ongoing | Settled | Dismissed | Plaintiff Win | Defendant Win | Resolved
+
+
+class CaseLookupAttorney(BaseModel):
+    name: str
+    firm: Optional[str] = None
+    role: str = "unknown"                  # plaintiff_attorney | defense_attorney | unknown
+    docket_intelligence: Optional[DocketIntelligence] = None
+    timeline: list[TimelineEntry] = []
+    expectation: Optional[AttorneyExpectation] = None
+    opposing_counsel_warning: Optional[str] = None
+
+
+class CaseLookupRequest(BaseModel):
+    query: Optional[str] = None
+    intake_case_id: Optional[str] = None   # for similarity scoring
+
+
+class CaseLookupResponse(BaseModel):
+    query_type: str                         # docket_number | case_name | description
+    case: CaseMeta
+    attorneys: list[CaseLookupAttorney]
+    case_summary: Optional[str] = None     # Claude plain-English summary
+    similarity: Optional[SimilarityAnalysis] = None
+    extracted_practice_area: str = "general_litigation"
+    extracted_venue: str = "nysd"

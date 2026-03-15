@@ -17,7 +17,13 @@ export default function HeroBlock() {
           to="/app"
           className="rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide px-8 min-h-[44px] flex items-center justify-center"
         >
-          Describe Your Case →
+          Describe Your Case
+        </Link>
+        <Link
+          to="/case-lookup"
+          className="rounded-md border border-[rgba(25,25,24,0.12)] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide px-8 min-h-[44px] flex items-center justify-center hover:border-[#FCAA2D] transition-colors"
+        >
+          Search by Similar Case
         </Link>
         <a
           href="#for-attorneys"
