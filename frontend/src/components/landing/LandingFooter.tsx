@@ -11,6 +11,9 @@ export default function LandingFooter() {
           <a href="https://www.linkedin.com/company/attorney-matchmaker" target="_blank" rel="noopener noreferrer" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">LinkedIn</a>
           <a href="https://github.com/peterzhang12312-jpg/attorney-matchmaker" target="_blank" rel="noopener noreferrer" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">GitHub</a>
           <Link to="/blog" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Blog</Link>
+          <Link to="/privacy" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Privacy</Link>
+          <Link to="/eula" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Terms</Link>
+          <Link to="/cookie-policy" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Cookies</Link>
         </div>
       </div>
     </footer>
