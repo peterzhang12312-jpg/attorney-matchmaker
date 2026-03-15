@@ -220,3 +220,54 @@ Add "Search by Case" as second CTA in HeroBlock and a nav link in LandingNav:
 | CourtListener timeout | Return partial result with available data, flag as incomplete |
 | No attorneys in docket | "No attorney data available for this case (RECAP data may be incomplete)" |
 | Gemini extraction fails | Fall back to raw query as search term |
+
+---
+
+## Claude Co-Work Additions (Market-Recommended)
+
+### 1. Claude Case Summary Panel
+Claude reads the full docket timeline and writes a 3-paragraph plain-English summary:
+- **What the dispute was about** — parties, legal theory, stakes
+- **How it unfolded** — key motion sequence, turning points
+- **How it resolved** — outcome, timeline, lessons
+
+Shown as a collapsible panel on `CaseResultCard` above the attorney list.
+Backend: `generate_case_summary(case_meta, timeline_entries) -> str` using Claude Opus.
+
+### 2. "Is My Case Similar?" Confidence Score
+After client completes intake AND searches a case, Claude compares both and returns:
+```python
+class SimilarityAnalysis(BaseModel):
+    score: int                    # 0-100
+    matching_elements: list[str]  # ["Same court (SDNY)", "Same legal theory (fraud)", "Same defendant type"]
+    key_differences: list[str]    # ["Your damages are 3x larger", "Different statute of limitations"]
+    recommendation: str           # "Strong match — this case is highly relevant to yours"
+```
+Shown as an amber score badge on the case result: "87% similar to your case"
+Backend: new Claude prompt comparing `case_lookup_result` + `intake_description`.
+Only shown when client has an active intake case_id (passed as optional param to `/api/case-lookup`).
+
+### 3. Opposing Counsel Alert
+Cross-reference each attorney in the looked-up case against:
+1. Static roster (`backend/data/attorneys.py`)
+2. Any attorney previously matched to the client's case
+
+If a match is found on the opposing side → show red warning badge on their `CaseAttorneyCard`:
+> ⚠ This attorney represented the **opposing side** in this case. Verify alignment before hiring.
+
+Backend: simple name/bar_number comparison in `case_lookup.py`.
+
+### 4. Case Outcome Tag
+Pull `date_terminated` + `pacer_case_id` disposition from CourtListener docket metadata.
+Map to human-readable tag shown on `CaseResultCard`:
+
+| CourtListener field | Display tag |
+|---|---|
+| `date_terminated` is null | 🟡 Ongoing |
+| disposition contains "settle" | 🟢 Settled |
+| disposition contains "dismiss" | 🔵 Dismissed |
+| disposition contains "judgment" for plaintiff | 🟢 Plaintiff Win |
+| disposition contains "judgment" for defendant | 🔴 Defendant Win |
+| disposition unknown | ⚪ Resolved |
+
+All four additions are included in `CaseLookupResponse` schema and rendered in frontend components.
