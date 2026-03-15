@@ -1,14 +1,10 @@
 """
-Matching pipeline router.
+Matching pipeline router — async version.
 
-POST /api/match -- orchestrates the full pipeline:
-  1. Retrieve stored case from intake
-  2. Gemini analysis (fact extraction)
-  3. Attorney scoring / ranking
-  4. Claude Opus audit of top candidates
-  5. Assemble and return unified response
+POST /api/match now enqueues a background job and returns { job_id } immediately.
+The full pipeline runs via asyncio.create_task and updates job state in Redis.
+Poll GET /api/jobs/{job_id} to track progress.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -24,14 +20,11 @@ from db.models import AttorneyRegistered, Lead, MatchResult as MatchResultRow
 from db.queries import get_case
 from db.session import get_db
 from middleware.rate_limit import limiter
-from models.schemas import (
-    ErrorResponse,
-    MatchRequest,
-    MatchResponse,
-)
+from models.schemas import ErrorResponse, MatchRequest, MatchResponse
 from services.claude_auditor import audit_matches
 from services.court_navigator import verify_attorneys
 from services.gemini_analyzer import analyze_case
+from services.job_store import create_job, update_job_stage, complete_job, fail_job
 from services.matcher import find_matches
 from services.venue_optimizer import recommend_venue
 
@@ -40,293 +33,253 @@ log = structlog.get_logger()
 router = APIRouter(prefix="/api", tags=["matching"])
 
 
+async def _run_pipeline(job_id: str, case_id: str) -> None:
+    """
+    Full match pipeline as a background task.
+    Updates Redis job state at each stage.
+    """
+    from db.session import AsyncSessionLocal
+
+    warnings: list[str] = []
+    start = time.monotonic()
+
+    async with AsyncSessionLocal() as db:
+        try:
+            # Stage: analyzing
+            await update_job_stage(job_id, "analyzing")
+
+            case_row = await get_case(case_id, db)
+            if case_row is None:
+                await fail_job(job_id, f"Case {case_id} not found")
+                return
+
+            description = case_row.description
+            adv = case_row.advanced_fields or {}
+            client_legal_area = adv.get("legal_area")
+            client_jurisdiction = adv.get("jurisdiction")
+            client_urgency = case_row.urgency or "medium"
+            evasive_defendant = adv.get("evasive_defendant", False)
+
+            budget_goals = None
+            if case_row.budget_goals:
+                from models.schemas import BudgetGoals
+                budget_goals = BudgetGoals(**case_row.budget_goals)
+
+            case_meta = {
+                "jurisdiction": client_jurisdiction,
+                "county": adv.get("county"),
+                "plaintiff_location": adv.get("plaintiff_location"),
+                "defendant_location": adv.get("defendant_location"),
+                "federal_question": adv.get("federal_question"),
+                "procedural_flags": adv.get("procedural_flags"),
+                "subject_matter_jurisdiction": adv.get("subject_matter_jurisdiction"),
+                "personal_jurisdiction_basis": adv.get("personal_jurisdiction_basis"),
+                "procedural_posture": adv.get("procedural_posture"),
+                "primary_remedy": adv.get("primary_remedy"),
+                "evasive_defendant": evasive_defendant,
+            }
+
+            try:
+                analysis = await analyze_case(
+                    description=description,
+                    client_legal_area=client_legal_area,
+                    client_jurisdiction=client_jurisdiction,
+                    client_urgency=client_urgency,
+                )
+            except (RuntimeError, ValueError) as exc:
+                await fail_job(job_id, f"Gemini analysis failed: {exc}")
+                return
+
+            # Stage: searching
+            await update_job_stage(job_id, "searching")
+
+            corporate_hq_state: Optional[str] = None
+            try:
+                from services.opencorporates_client import detect_corporate_defendants, lookup_corporation
+                scan_text = analysis.fact_summary + " " + " ".join(analysis.key_issues)
+                corp_names = (
+                    detect_corporate_defendants(scan_text)
+                    or detect_corporate_defendants(description[:2000])
+                )
+                if corp_names:
+                    corp = await lookup_corporation(corp_names[0])
+                    if corp and corp.hq_state:
+                        corporate_hq_state = corp.hq_state
+            except Exception as exc:
+                warnings.append(f"Corporate lookup unavailable: {exc}")
+
+            venue_recommendation = None
+            try:
+                venue_recommendation = await recommend_venue(
+                    analysis, description, corporate_hq_state=corporate_hq_state
+                )
+            except Exception as exc:
+                warnings.append(f"Venue recommendation unavailable: {exc}")
+
+            # Stage: scoring
+            await update_job_stage(job_id, "scoring")
+
+            try:
+                candidates = await find_matches(
+                    analysis,
+                    case_description=description,
+                    top_n=5,
+                    budget_goals=budget_goals,
+                    case_meta=case_meta,
+                    fetch_docket_details=True,
+                    evasive_defendant=evasive_defendant,
+                )
+            except Exception as exc:
+                await fail_job(job_id, f"Matching error: {exc}")
+                return
+
+            if not candidates:
+                warnings.append("No attorneys matched the case profile.")
+
+            # Stage: auditing
+            await update_job_stage(job_id, "auditing")
+
+            audit = None
+            if candidates:
+                try:
+                    audit = await audit_matches(
+                        case_description=description,
+                        analysis=analysis,
+                        candidates=candidates,
+                        evasive_defendant=evasive_defendant,
+                    )
+                except Exception as exc:
+                    warnings.append(f"Audit unavailable: {exc}")
+
+            if candidates:
+                try:
+                    verifications = await asyncio.wait_for(
+                        verify_attorneys(
+                            attorney_names=[c.attorney.name for c in candidates],
+                            venue=(
+                                venue_recommendation.recommended_court
+                                if venue_recommendation else "nysd"
+                            ),
+                            evasive_defendant=evasive_defendant,
+                        ),
+                        timeout=25.0,
+                    )
+                    ver_map = {v.attorney_name: v for v in verifications}
+                    for candidate in candidates:
+                        candidate.court_verification = ver_map.get(candidate.attorney.name)
+                except Exception as exc:
+                    warnings.append(f"Court verification unavailable: {exc}")
+
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+
+            response = MatchResponse(
+                case_id=case_id,
+                gemini_analysis=analysis,
+                matches=candidates,
+                audit=audit,
+                pipeline_duration_ms=elapsed_ms,
+                warnings=warnings,
+                venue_recommendation=venue_recommendation,
+            )
+
+            # Persist match result
+            try:
+                match_row = MatchResultRow(
+                    case_id=case_id,
+                    matches=[m.model_dump(mode="json") for m in candidates],
+                    audit=audit,
+                    venue_recommendation=(
+                        venue_recommendation.model_dump(mode="json")
+                        if venue_recommendation else None
+                    ),
+                )
+                db.add(match_row)
+                await db.commit()
+            except Exception as exc:
+                log.warning("match_persist_failed", error=str(exc))
+
+            # Email and lead creation (best-effort)
+            try:
+                from services.email import send_matches_ready, send_lead_to_attorney
+
+                client_email = getattr(case_row, "client_email", None) or ""
+                if client_email and candidates:
+                    asyncio.create_task(send_matches_ready(
+                        to_email=client_email,
+                        case_id=case_id,
+                        match_count=len(candidates),
+                    ))
+
+                practice_area = analysis.primary_legal_area
+                jurisdiction = analysis.jurisdiction
+                top_names = [c.attorney.name for c in candidates[:3]]
+
+                if top_names:
+                    result_q = await db.execute(
+                        select(AttorneyRegistered).where(
+                            AttorneyRegistered.name.in_(top_names),
+                            AttorneyRegistered.accepting_clients == "true",
+                        )
+                    )
+                    registered = result_q.scalars().all()
+                    for atty in registered:
+                        lead = Lead(
+                            case_id=case_id,
+                            attorney_id=atty.id,
+                            status="sent",
+                            case_summary={
+                                "practice_area": practice_area,
+                                "urgency": client_urgency,
+                                "jurisdiction": jurisdiction,
+                            },
+                        )
+                        db.add(lead)
+                        asyncio.create_task(send_lead_to_attorney(
+                            attorney_email=atty.email,
+                            attorney_name=atty.name,
+                            practice_area=practice_area,
+                            urgency=client_urgency,
+                            jurisdiction=jurisdiction,
+                        ))
+                    if registered:
+                        await db.commit()
+            except Exception as exc:
+                log.warning("email_lead_creation_failed", error=str(exc))
+
+            await complete_job(job_id, response.model_dump(mode="json"))
+            log.info("pipeline_complete", case_id=case_id, duration_ms=elapsed_ms)
+
+        except Exception as exc:
+            log.error("pipeline_unexpected_error", job_id=job_id, error=str(exc))
+            await fail_job(job_id, str(exc))
+
+
 @router.post(
     "/match",
-    response_model=MatchResponse,
+    summary="Enqueue the full matching pipeline — returns job_id immediately",
     responses={
         404: {"model": ErrorResponse, "description": "Case not found"},
-        502: {"model": ErrorResponse, "description": "Upstream AI service failure"},
     },
-    summary="Run the full matching pipeline",
-    description=(
-        "Given a case_id from /api/intake, runs Gemini fact extraction, "
-        "scores all attorneys, and validates the top matches with Claude Opus. "
-        "Returns the complete analysis, ranked matches, and audit results."
-    ),
 )
 @limiter.limit("5/minute")
 async def run_match_pipeline(
     request: Request,
     body: MatchRequest,
     db: AsyncSession = Depends(get_db),
-) -> MatchResponse:
-    start = time.monotonic()
-    warnings: list[str] = []
-
-    # ----- Step 0: Retrieve the case ----------------------------------------
+) -> dict:
+    """
+    Enqueues the match pipeline as a background task.
+    Returns { job_id } immediately. Poll GET /api/jobs/{job_id} for progress.
+    """
     case_row = await get_case(body.case_id, db)
     if case_row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Case {body.case_id} not found. Submit facts via /api/intake first.",
+            detail=f"Case {body.case_id} not found.",
         )
 
-    description = case_row.description
-    adv = case_row.advanced_fields or {}
-    client_legal_area = adv.get("legal_area")
-    client_jurisdiction = adv.get("jurisdiction")
-    client_urgency = case_row.urgency or "medium"
+    job_id = await create_job(body.case_id)
+    asyncio.create_task(_run_pipeline(job_id, body.case_id))
 
-    # Extract budget goals if the client provided them at intake
-    budget_goals_data = case_row.budget_goals
-    budget_goals = None
-    if budget_goals_data:
-        from models.schemas import BudgetGoals
-        budget_goals = BudgetGoals(**budget_goals_data)
-
-    evasive_defendant = adv.get("evasive_defendant", False)
-
-    # Build case_meta for jurisdictional alignment scorer
-    case_meta = {
-        "jurisdiction": client_jurisdiction,
-        "county": adv.get("county"),
-        "plaintiff_location": adv.get("plaintiff_location"),
-        "defendant_location": adv.get("defendant_location"),
-        "federal_question": adv.get("federal_question"),
-        "procedural_flags": adv.get("procedural_flags"),
-        "subject_matter_jurisdiction": adv.get("subject_matter_jurisdiction"),
-        "personal_jurisdiction_basis": adv.get("personal_jurisdiction_basis"),
-        "procedural_posture": adv.get("procedural_posture"),
-        "primary_remedy": adv.get("primary_remedy"),
-        "evasive_defendant": evasive_defendant,
-    }
-
-    log.info("match_pipeline_start", case_id=body.case_id)
-
-    # ----- Step 1: Gemini analysis ------------------------------------------
-    try:
-        analysis = await analyze_case(
-            description=description,
-            client_legal_area=client_legal_area,
-            client_jurisdiction=client_jurisdiction,
-            client_urgency=client_urgency,
-        )
-    except RuntimeError as exc:
-        log.error("gemini_analysis_failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini analysis failed: {exc}",
-        )
-    except ValueError as exc:
-        log.error("gemini_output_parse_failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini returned invalid output: {exc}",
-        )
-
-    log.info(
-        "gemini_analysis_complete",
-        primary_area=analysis.primary_legal_area,
-        jurisdiction=analysis.jurisdiction,
-        issue_count=len(analysis.key_issues),
-    )
-
-    # ----- Step 1b: Corporate defendant HQ lookup ---------------------------
-    corporate_hq_state: Optional[str] = None
-    try:
-        from services.opencorporates_client import detect_corporate_defendants, lookup_corporation
-        # Scan Gemini's cleaner fact summary first; fall back to raw description
-        scan_text = analysis.fact_summary + " " + " ".join(analysis.key_issues)
-        corp_names = detect_corporate_defendants(scan_text) or detect_corporate_defendants(description[:2000])
-        if corp_names:
-            corp = await lookup_corporation(corp_names[0])
-            if corp and corp.hq_state:
-                corporate_hq_state = corp.hq_state
-                log.info(
-                    "corporate_hq_resolved",
-                    company=corp_names[0],
-                    hq_state=corporate_hq_state,
-                )
-    except Exception as exc:
-        log.warning("corporate_lookup_failed", error=str(exc))
-        warnings.append(f"Corporate defendant lookup unavailable: {exc}")
-
-    # ----- Step 1c: Venue recommendation ------------------------------------
-    venue_recommendation = None
-    try:
-        venue_recommendation = await recommend_venue(analysis, description, corporate_hq_state=corporate_hq_state)
-        log.info(
-            "venue_recommendation",
-            court=venue_recommendation.recommended_court,
-            john_doe=venue_recommendation.john_doe_protocol,
-        )
-    except Exception as exc:
-        log.warning("venue_optimizer_failed", error=str(exc))
-        warnings.append(f"Venue recommendation unavailable: {exc}")
-
-    # ----- Step 2: Score and rank attorneys ----------------------------------
-    try:
-        candidates = await find_matches(
-            analysis,
-            case_description=description,
-            top_n=5,
-            budget_goals=budget_goals,
-            case_meta=case_meta,
-            fetch_docket_details=True,
-            evasive_defendant=evasive_defendant,
-        )
-    except Exception as exc:
-        log.error("matching_algorithm_failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Matching algorithm error: {exc}",
-        )
-
-    if not candidates:
-        warnings.append(
-            "No attorneys matched the case profile. "
-            "This may indicate a coverage gap in the attorney database."
-        )
-
-    log.info("matcher_results", candidate_count=len(candidates))
-
-    # ----- Step 3: Claude Opus audit ----------------------------------------
-    audit = None
-    if candidates:
-        try:
-            audit = await audit_matches(
-                case_description=description,
-                analysis=analysis,
-                candidates=candidates,
-                evasive_defendant=evasive_defendant,
-            )
-        except RuntimeError as exc:
-            # Audit is non-blocking -- if it fails we still return matches
-            log.warning("opus_audit_failed", error=str(exc))
-            warnings.append(f"Audit layer unavailable: {exc}")
-        except ValueError as exc:
-            log.warning("opus_audit_output_invalid", error=str(exc))
-            warnings.append(f"Audit produced invalid output: {exc}")
-
-    # ----- Step 3b: Live court verification (non-blocking) ------------------
-    if candidates:
-        try:
-            verifications = await asyncio.wait_for(
-                verify_attorneys(
-                    attorney_names=[c.attorney.name for c in candidates],
-                    venue=(
-                        venue_recommendation.recommended_court
-                        if venue_recommendation else "nysd"
-                    ),
-                    evasive_defendant=evasive_defendant,
-                ),
-                timeout=25.0,
-            )
-            ver_map = {v.attorney_name: v for v in verifications}
-            for candidate in candidates:
-                candidate.court_verification = ver_map.get(candidate.attorney.name)
-            log.info(
-                "court_verification_attached",
-                verified_count=sum(1 for v in verifications if v.records_found > 0),
-            )
-        except Exception as exc:
-            log.warning("court_verification_unavailable", error=str(exc))
-            warnings.append(f"Live court verification unavailable: {exc}")
-
-    # ----- Step 4: Assemble response ----------------------------------------
-    elapsed_ms = int((time.monotonic() - start) * 1000)
-
-    log.info(
-        "pipeline_complete",
-        case_id=body.case_id,
-        duration_ms=elapsed_ms,
-        match_count=len(candidates),
-        audited=audit is not None,
-    )
-
-    response = MatchResponse(
-        case_id=body.case_id,
-        gemini_analysis=analysis,
-        matches=candidates,
-        audit=audit,
-        pipeline_duration_ms=elapsed_ms,
-        warnings=warnings,
-        venue_recommendation=venue_recommendation,
-    )
-
-    # ----- Step 5: Persist match results ------------------------------------
-    try:
-        match_row = MatchResultRow(
-            case_id=body.case_id,
-            matches=[m.model_dump(mode="json") for m in candidates],
-            audit=audit,
-            venue_recommendation=(
-                venue_recommendation.model_dump(mode="json")
-                if venue_recommendation else None
-            ),
-        )
-        db.add(match_row)
-        await db.commit()
-    except Exception as exc:
-        log.warning("match_persist_failed", error=str(exc))
-
-    # ----- Step 6: Email notifications & lead creation (best-effort) --------
-    try:
-        from services.email import send_matches_ready, send_lead_to_attorney
-
-        # Notify client that matches are ready
-        client_email = getattr(case_row, "client_email", None) or ""
-        if client_email and candidates:
-            asyncio.create_task(send_matches_ready(
-                to_email=client_email,
-                case_id=body.case_id,
-                match_count=len(candidates),
-            ))
-
-        # Create Lead rows for top 3 matched attorneys (if they are registered)
-        # and send lead notification emails
-        practice_area = analysis.primary_legal_area
-        jurisdiction = analysis.jurisdiction
-        top_names = [c.attorney.name for c in candidates[:3]]
-
-        if top_names:
-            result = await db.execute(
-                select(AttorneyRegistered).where(
-                    AttorneyRegistered.name.in_(top_names),
-                    AttorneyRegistered.accepting_clients == "true",
-                )
-            )
-            registered = result.scalars().all()
-
-            for atty in registered:
-                lead = Lead(
-                    case_id=body.case_id,
-                    attorney_id=atty.id,
-                    status="sent",
-                    case_summary={
-                        "practice_area": practice_area,
-                        "urgency": client_urgency,
-                        "jurisdiction": jurisdiction,
-                    },
-                )
-                db.add(lead)
-                # Fire-and-forget email to attorney
-                asyncio.create_task(send_lead_to_attorney(
-                    attorney_email=atty.email,
-                    attorney_name=atty.name,
-                    practice_area=practice_area,
-                    urgency=client_urgency,
-                    jurisdiction=jurisdiction,
-                ))
-
-            if registered:
-                await db.commit()
-                log.info(
-                    "leads_created",
-                    case_id=body.case_id,
-                    lead_count=len(registered),
-                )
-    except Exception as exc:
-        log.warning("email_lead_creation_failed", error=str(exc))
-
-    return response
+    log.info("match_job_enqueued", case_id=body.case_id, job_id=job_id)
+    return {"job_id": job_id, "case_id": body.case_id, "stage": "queued"}

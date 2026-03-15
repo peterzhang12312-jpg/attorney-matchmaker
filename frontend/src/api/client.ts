@@ -88,6 +88,23 @@ export async function runMatch(
   });
 }
 
+/** Enqueue async match — returns { job_id, case_id, stage } immediately. */
+export async function enqueueMatch(
+  payload: MatchRequest,
+): Promise<{ job_id: string; case_id: string; stage: string }> {
+  return request<{ job_id: string; case_id: string; stage: string }>("/api/match", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Poll a job by ID. Returns null if network blip; throws if 404. */
+export async function pollJob(
+  jobId: string,
+): Promise<{ stage: string; case_id: string; result?: MatchResponse; error?: string }> {
+  return request(`/api/jobs/${jobId}`);
+}
+
 /* ---------- Attorney Roster ---------- */
 
 export async function fetchAttorneys(params?: {

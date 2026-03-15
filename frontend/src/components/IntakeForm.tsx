@@ -1,9 +1,10 @@
-import { useReducer, useState } from "react";
+import { useReducer, useState, useRef } from "react";
 import {
   Loader2, Search, ChevronRight, ChevronLeft, Sparkles,
 } from "lucide-react";
 import type { MatchResponse, BudgetGoals } from "../types/api";
-import { submitIntake, runMatch, refineFacts } from "../api/client";
+import { submitIntake, enqueueMatch, pollJob, refineFacts } from "../api/client";
+import MatchProgressBar from "./MatchProgressBar";
 import StepProgressBar from "./StepProgressBar";
 import RefinementStep from "./RefinementStep";
 import BudgetGoalsStep from "./BudgetGoalsStep";
@@ -309,8 +310,10 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
   }));
 
   const [loading, setLoading] = useState(false);
+  const [jobStage, setJobStage] = useState<string>("queued");
   const [refineLoading, setRefineLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     step, facts, urgency, refinementQuestions, refinementAnswers, budgetGoals,
@@ -345,10 +348,11 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
     }
   };
 
-  /* ---- Submit (Step 4) ---- */
+  /* ---- Submit (Step 4) — async polling ---- */
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    setJobStage("queued");
     const fullDescription = facts.trim() +
       (refinementAnswers.trim() ? "\n\nAdditional context:\n" + refinementAnswers.trim() : "");
 
@@ -367,13 +371,30 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
           advanced_mode: true,
         }),
       });
-      const result = await runMatch({ case_id: intake.case_id });
-      clearSession();
-      dispatch({ type: "RESET" });
-      onMatchComplete(result);
+
+      // Enqueue the pipeline — get job_id immediately
+      const { job_id } = await enqueueMatch({ case_id: intake.case_id });
+
+      // Poll every 2 seconds
+      pollRef.current = setInterval(async () => {
+        try {
+          const job = await pollJob(job_id);
+          setJobStage(job.stage);
+          if (job.stage === "complete" && job.result) {
+            clearInterval(pollRef.current!);
+            clearSession();
+            dispatch({ type: "RESET" });
+            setLoading(false);
+            onMatchComplete(job.result);
+          } else if (job.stage === "failed") {
+            clearInterval(pollRef.current!);
+            setError(job.error || "Match pipeline failed");
+            setLoading(false);
+          }
+        } catch { /* network blip — keep polling */ }
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
@@ -617,9 +638,9 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
               </div>
             )}
             {loading && (
-              <p className="text-xs text-gray-400 text-center mb-2">
-                Analyzing your case and finding the best counsel...
-              </p>
+              <div className="mb-4">
+                <MatchProgressBar stage={jobStage} />
+              </div>
             )}
 
             <NavRow
