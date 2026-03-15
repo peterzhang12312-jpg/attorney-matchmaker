@@ -28,7 +28,7 @@ from services.courtlistener_client import (
 )
 from data.attorneys import get_all_attorneys
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
 # Domain query map

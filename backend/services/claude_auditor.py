@@ -35,7 +35,7 @@ from models.schemas import (
     MatchCandidate,
 )
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 AUDIT_MODEL = "claude-opus-4-6"
 

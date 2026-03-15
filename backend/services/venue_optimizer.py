@@ -19,7 +19,7 @@ from typing import Optional
 
 from models.schemas import GeminiAnalysis, VenueRecommendation
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 # ---------------------------------------------------------------------------
 # Court label map

@@ -34,7 +34,7 @@ from models.schemas import (
 from services.courtlistener_client import fetch_attorneys_by_keywords, _COURT_JURISDICTIONS
 from services.gemini_analyzer import extract_search_keywords
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 TOP_N = 5
 

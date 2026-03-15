@@ -26,7 +26,7 @@ from google.genai import types
 
 from models.schemas import CourtListenerKeywords, GeminiAnalysis
 
-log = structlog.get_log()
+log = structlog.get_logger()
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
