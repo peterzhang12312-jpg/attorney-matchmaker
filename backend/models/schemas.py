@@ -167,7 +167,7 @@ class GeminiAnalysis(BaseModel):
         description="Additional relevant practice areas.",
     )
     jurisdiction: str = Field(
-        ..., description="Inferred or confirmed jurisdiction."
+        "Unknown", description="Inferred or confirmed jurisdiction."
     )
     urgency_level: str = Field(
         ..., description="Assessed urgency based on fact pattern."

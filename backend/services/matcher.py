@@ -485,7 +485,13 @@ async def find_matches(
     # Sort descending by composite score
     scored.sort(key=lambda m: m.score_breakdown.composite, reverse=True)
 
-    top = scored[:top_n]
+    # Apply minimum relevance threshold: at least some specialization or jurisdiction
+    # overlap required. Prevents padding with completely irrelevant attorneys.
+    _MIN_THRESHOLD = 20.0
+    relevant = [m for m in scored if m.score_breakdown.composite >= _MIN_THRESHOLD]
+    # Fall back to top scored candidates if nothing meets the threshold
+    top_pool = relevant if relevant else scored
+    top = top_pool[:top_n]
 
     # Enrich top candidates with Harvard CAP landmark caselaw data (dormant without key)
     if case_description:

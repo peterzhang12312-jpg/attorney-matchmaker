@@ -157,6 +157,11 @@ async def analyze_case(
             f"Gemini returned unparseable output. First 300 chars: {raw_text[:300]}"
         )
 
+    # Null-guard: Gemini occasionally returns null for jurisdiction on
+    # ambiguous matters (immigration, federal agencies, etc.).
+    if not parsed.get("jurisdiction"):
+        parsed["jurisdiction"] = "Unknown"
+
     # Validate against Pydantic schema — new optional fields default gracefully
     try:
         analysis = GeminiAnalysis(

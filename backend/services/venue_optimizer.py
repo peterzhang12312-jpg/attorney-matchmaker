@@ -29,7 +29,28 @@ _COURT_LABELS: dict[str, str] = {
     "nysd":    "S.D.N.Y. (Manhattan Federal Court)",
     "nyed":    "E.D.N.Y. (Brooklyn Federal Court)",
     "nysupct": "New York Supreme Court (Queens County)",
+    "cand":    "N.D. Cal. (San Francisco Federal Court)",
+    "cacd":    "C.D. Cal. (Los Angeles Federal Court)",
+    "cal":     "California Superior Court",
 }
+
+# Phrases that indicate a California jurisdiction
+_CA_INDICATORS = [
+    "n.d. cal", "s.d. cal", "c.d. cal", "e.d. cal",
+    "northern district of california", "southern district of california",
+    "central district of california",
+    ", ca", "california", " ca ", "bay area", "los angeles", "san francisco",
+    "san jose", "san diego", "sacramento",
+]
+
+
+def _is_california(analysis: GeminiAnalysis) -> bool:
+    """Returns True when Gemini's jurisdiction string indicates California."""
+    jur = (analysis.jurisdiction or "").lower()
+    loc_p = (analysis.inferred_plaintiff_location or "").lower()
+    loc_d = (analysis.inferred_defendant_location or "").lower()
+    combined = f"{jur} {loc_p} {loc_d}"
+    return any(ind in combined for ind in _CA_INDICATORS)
 
 # Statutes / phrases that imply federal question jurisdiction
 _FEDERAL_STATUTES = [
@@ -120,12 +141,58 @@ async def recommend_venue(
                 corporate_hq_state,
             )
 
+    is_ca = _is_california(analysis)
+
     log.info(
-        "Venue optimizer: federal_q=%s, diversity=%s, unknown_defendant=%s, corp_hq=%s",
-        federal_q, diversity, unknown_defendant, corporate_hq_state,
+        "Venue optimizer: federal_q=%s, diversity=%s, unknown_defendant=%s, corp_hq=%s, is_ca=%s",
+        federal_q, diversity, unknown_defendant, corporate_hq_state, is_ca,
     )
 
-    # ---- Priority 1: Federal Question ----------------------------------------
+    # ---- California routing (overrides NY defaults) --------------------------
+    if is_ca:
+        primary = "cand" if "n.d. cal" in (analysis.jurisdiction or "").lower() else "cacd"
+        secondary = "cacd" if primary == "cand" else "cand"
+        if federal_q:
+            return VenueRecommendation(
+                recommended_court=primary,
+                recommended_court_label=_COURT_LABELS[primary],
+                reasoning=(
+                    f"Federal question jurisdiction detected. {_COURT_LABELS[primary]} is "
+                    "recommended as the primary California federal venue based on the "
+                    "identified jurisdiction and legal issues."
+                ),
+                alternatives=[
+                    {
+                        "court": secondary,
+                        "label": _COURT_LABELS[secondary],
+                        "rationale": f"Alternative California federal district if operative events occurred there.",
+                    },
+                    {
+                        "court": "cal",
+                        "label": _COURT_LABELS["cal"],
+                        "rationale": "California state court if federal claims are dropped.",
+                    },
+                ],
+                john_doe_protocol=False,
+            )
+        return VenueRecommendation(
+            recommended_court="cal",
+            recommended_court_label=_COURT_LABELS["cal"],
+            reasoning=(
+                "California state-law matter. California Superior Court is recommended. "
+                "Federal court may be appropriate if diversity or a federal hook is established."
+            ),
+            alternatives=[
+                {
+                    "court": primary,
+                    "label": _COURT_LABELS[primary],
+                    "rationale": "Federal court if diversity jurisdiction or a federal statute applies.",
+                },
+            ],
+            john_doe_protocol=unknown_defendant,
+        )
+
+    # ---- Priority 1: Federal Question (NY) -----------------------------------
     if federal_q:
         return VenueRecommendation(
             recommended_court="nysd",
