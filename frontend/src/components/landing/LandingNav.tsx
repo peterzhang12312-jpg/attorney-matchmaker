@@ -20,6 +20,12 @@ export default function LandingNav() {
           <Link to="/case-lookup" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
             Case Lookup
           </Link>
+          <Link to="/coverage" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
+            Coverage
+          </Link>
+          <Link to="/dashboard" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
+            My Cases
+          </Link>
         </div>
         <Link
           to="/app"
