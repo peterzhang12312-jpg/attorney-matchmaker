@@ -214,9 +214,14 @@ if FRONTEND_DIST.exists():
         app.mount("/assets", StaticFiles(directory=str(_assets)), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str) -> FileResponse:
+    async def serve_spa(request: Request, full_path: str):
         """Serve the React SPA. Returns a specific static file if it exists,
-        otherwise falls back to index.html so React Router handles routing."""
+        otherwise falls back to index.html so React Router handles routing.
+        Also intercepts LinkedIn OAuth callbacks at the root URL."""
+        from fastapi.responses import HTMLResponse as _HTML
+        from routers.linkedin_auth import linkedin_callback
+        if request.query_params.get("code") and request.query_params.get("state", "").startswith("amatch"):
+            return await linkedin_callback(request)
         target = FRONTEND_DIST / full_path
         if full_path and target.exists() and target.is_file():
             return FileResponse(str(target))

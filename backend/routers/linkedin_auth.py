@@ -14,7 +14,7 @@ router = APIRouter()
 
 LINKEDIN_CLIENT_ID = os.environ.get("LINKEDIN_CLIENT_ID", "")
 LINKEDIN_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
-REDIRECT_URI = "https://attorney-matchmaker.onrender.com/api/linkedin/callback"
+REDIRECT_URI = "https://attorney-matchmaker.onrender.com"
 
 
 @router.get("/api/linkedin/callback", response_class=HTMLResponse, include_in_schema=False)
