@@ -25,9 +25,12 @@ from models.schemas import (
     AttorneyProfileResponse,
     AttorneyProfileUpdate,
     AttorneyRegisterRequest,
+    LeadContactInfo,
     LeadRespondRequest,
+    LeadRevealResponse,
     LeadSummary,
 )
+from services.billing import create_payment_intent, get_lead_price, verify_payment_succeeded
 
 log = structlog.get_logger()
 
@@ -349,4 +352,115 @@ async def respond_to_lead(
         jurisdiction=lead.case_summary.get("jurisdiction") if lead.case_summary else None,
         sent_at=lead.sent_at.isoformat() if lead.sent_at else None,
         responded_at=lead.responded_at.isoformat() if lead.responded_at else None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/attorney/leads/{lead_id}/reveal
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/leads/{lead_id}/reveal",
+    response_model=LeadRevealResponse,
+    summary="Initiate Stripe payment to reveal client contact info",
+)
+@limiter.limit("10/minute")
+async def initiate_lead_reveal(
+    request: Request,
+    lead_id: str,
+    db: AsyncSession = Depends(get_db),
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+) -> LeadRevealResponse:
+    result = await db.execute(
+        select(Lead).where(Lead.id == lead_id, Lead.attorney_id == attorney.id)
+    )
+    lead = result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if lead.revealed_at:
+        raise HTTPException(status_code=409, detail="Lead already revealed")
+
+    practice_area = (lead.case_summary or {}).get("practice_area", "general_litigation")
+    amount = get_lead_price(practice_area)
+
+    client_secret = await create_payment_intent(
+        amount_cents=amount,
+        lead_id=lead_id,
+        attorney_id=attorney.id,
+        practice_area=practice_area,
+    )
+
+    # Store payment intent ID on the lead (the PI id is the part before _secret_)
+    await db.execute(
+        update(Lead)
+        .where(Lead.id == lead_id)
+        .values(stripe_payment_intent_id=client_secret.split("_secret_")[0])
+    )
+    await db.commit()
+
+    return LeadRevealResponse(
+        client_secret=client_secret,
+        amount_cents=amount,
+        lead_id=lead_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/attorney/leads/{lead_id}/confirm-reveal
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/leads/{lead_id}/confirm-reveal",
+    response_model=LeadContactInfo,
+    summary="Confirm Stripe payment and return client contact info",
+)
+@limiter.limit("10/minute")
+async def confirm_lead_reveal(
+    request: Request,
+    lead_id: str,
+    payment_intent_id: str,
+    db: AsyncSession = Depends(get_db),
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+) -> LeadContactInfo:
+    result = await db.execute(
+        select(Lead, Case).join(Case, Lead.case_id == Case.case_id).where(
+            Lead.id == lead_id,
+            Lead.attorney_id == attorney.id,
+        )
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    lead, case = row
+
+    if not await verify_payment_succeeded(payment_intent_id):
+        raise HTTPException(status_code=402, detail="Payment not confirmed")
+
+    now = datetime.now(timezone.utc)
+    contact = {
+        "name": None,
+        "email": case.client_email,
+    }
+
+    await db.execute(
+        update(Lead)
+        .where(Lead.id == lead_id)
+        .values(
+            status="revealed",
+            revealed_at=now,
+            client_contact=contact,
+        )
+    )
+    await db.commit()
+
+    log.info("lead_revealed", lead_id=lead_id, attorney_id=attorney.id)
+
+    summary = lead.case_summary or {}
+    return LeadContactInfo(
+        client_name=contact.get("name"),
+        client_email=contact.get("email"),
+        practice_area=summary.get("practice_area"),
+        urgency=summary.get("urgency"),
+        jurisdiction=summary.get("jurisdiction"),
     )

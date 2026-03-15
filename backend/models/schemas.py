@@ -665,3 +665,23 @@ class CaseLookupResponse(BaseModel):
     similarity: Optional[SimilarityAnalysis] = None
     extracted_practice_area: str = "general_litigation"
     extracted_venue: str = "nysd"
+
+
+# ---------------------------------------------------------------------------
+# Stripe / Lead Reveal schemas
+# ---------------------------------------------------------------------------
+
+class LeadRevealResponse(BaseModel):
+    """Returned when attorney initiates lead reveal payment."""
+    client_secret: str
+    amount_cents: int
+    lead_id: str
+
+
+class LeadContactInfo(BaseModel):
+    """Client contact details returned after successful payment."""
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    practice_area: Optional[str] = None
+    urgency: Optional[str] = None
+    jurisdiction: Optional[str] = None

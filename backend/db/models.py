@@ -95,9 +95,23 @@ class Lead(Base):
         ForeignKey("attorneys_registered.id", ondelete="CASCADE"),
         nullable=False,
     )
-    status = Column(String, nullable=False, default="sent")  # sent/viewed/accepted/declined
+    status = Column(String, nullable=False, default="sent")  # sent/viewed/accepted/declined/revealed
     case_summary = Column(JSON, nullable=True)  # practice_area, urgency, jurisdiction -- NO PII
+    stripe_payment_intent_id = Column(String, nullable=True)
+    revealed_at = Column(DateTime(timezone=True), nullable=True)
+    client_contact = Column(JSON, nullable=True)  # populated after payment: {name, email, phone}
     sent_at = Column(DateTime(timezone=True), server_default=func.now())
     responded_at = Column(DateTime(timezone=True), nullable=True)
 
     attorney = relationship("AttorneyRegistered", back_populates="leads")
+
+
+class CoverageRequest(Base):
+    """Demand signal when a user requests attorney coverage in a state."""
+
+    __tablename__ = "coverage_requests"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    state = Column(String, nullable=False)
+    email = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
