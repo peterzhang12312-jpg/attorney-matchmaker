@@ -63,7 +63,7 @@ async def linkedin_callback(request: Request):
         )
         with urllib.request.urlopen(req2, timeout=10) as r2:
             profile = json.loads(r2.read())
-        profile_name = profile.get("name", "unknown")
+        profile_name = profile.get("name") or profile.get("localizedFirstName", "unknown")
         profile_email = profile.get("email", "")
     except Exception:
         pass
