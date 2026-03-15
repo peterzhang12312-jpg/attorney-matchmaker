@@ -18,6 +18,7 @@ import structlog
 from typing import Optional
 
 from models.schemas import GeminiAnalysis, VenueRecommendation
+from data.federal_courts import FEDERAL_COURTS, STATE_TO_PRIMARY_COURT
 
 log = structlog.get_logger()
 
@@ -33,6 +34,8 @@ _COURT_LABELS: dict[str, str] = {
     "cacd":    "C.D. Cal. (Los Angeles Federal Court)",
     "cal":     "California Superior Court",
 }
+# Populate all federal court labels from the data file
+_COURT_LABELS.update({k: v["label"] for k, v in FEDERAL_COURTS.items()})
 
 # Phrases that indicate a California jurisdiction
 _CA_INDICATORS = [
@@ -90,6 +93,33 @@ def _has_federal_question(analysis: GeminiAnalysis) -> bool:
     area_text = analysis.primary_legal_area.lower()
     combined = issues_text + " " + area_text
     return any(kw in combined for kw in _FEDERAL_STATUTES)
+
+
+def _infer_state(analysis: GeminiAnalysis) -> Optional[str]:
+    """Extract 2-letter US state from Gemini jurisdiction string."""
+    import re
+    jur = (analysis.jurisdiction or "").upper()
+    state_patterns = {
+        "TEX": "TX", "TEXAS": "TX", "FLA": "FL", "FLORIDA": "FL",
+        "ILL": "IL", "ILLINOIS": "IL", "MICH": "MI", "MICHIGAN": "MI",
+        "PENN": "PA", "PENNSYLVANIA": "PA", "OHIO": "OH", "WASH": "WA",
+        "WASHINGTON": "WA", "COLO": "CO", "COLORADO": "CO",
+        "MASS": "MA", "MASSACHUSETTS": "MA", "CONN": "CT",
+        "ORE": "OR", "OREGON": "OR",
+        "MINN": "MN", "MINNESOTA": "MN", "WISC": "WI", "WISCONSIN": "WI",
+        "MISS": "MS", "MISSISSIPPI": "MS", "ARIZ": "AZ", "ARIZONA": "AZ",
+        "TENN": "TN", "TENNESSEE": "TN", "KAN": "KS", "KANSAS": "KS",
+        "NEV": "NV", "NEVADA": "NV", "ARK": "AR", "ARKANSAS": "AR",
+        "OKLA": "OK", "OKLAHOMA": "OK", "UTAH": "UT", "IOWA": "IA",
+        "D.C.": "DC", "COLUMBIA": "DC",
+    }
+    for pattern, state in state_patterns.items():
+        if pattern in jur:
+            return state
+    for state in _STATE_ABBREVS:
+        if re.search(rf'\b{state}\b', jur):
+            return state
+    return None
 
 
 def _has_diversity(analysis: GeminiAnalysis) -> bool:
@@ -191,6 +221,29 @@ async def recommend_venue(
             ],
             john_doe_protocol=unknown_defendant,
         )
+
+    # ---- Other US states (route to primary federal district) ----------------
+    inferred_state = _infer_state(analysis)
+    if inferred_state and inferred_state not in ("NY", "CA") and inferred_state in STATE_TO_PRIMARY_COURT:
+        primary_court_id = STATE_TO_PRIMARY_COURT[inferred_state]
+        court_info = FEDERAL_COURTS.get(primary_court_id, {})
+        court_label = court_info.get("label", primary_court_id.upper())
+        coverage = court_info.get("coverage", "limited")
+        coverage_note = (
+            "" if coverage == "full"
+            else f" Note: CourtListener RECAP coverage for {inferred_state} is {coverage} — results may be less precise."
+        )
+        if federal_q or diversity:
+            return VenueRecommendation(
+                recommended_court=primary_court_id,
+                recommended_court_label=court_label,
+                reasoning=(
+                    f"{'Federal question' if federal_q else 'Diversity'} jurisdiction detected. "
+                    f"{court_label} is the primary federal venue for {inferred_state}.{coverage_note}"
+                ),
+                alternatives=[],
+                john_doe_protocol=False,
+            )
 
     # ---- Priority 1: Federal Question (NY) -----------------------------------
     if federal_q:

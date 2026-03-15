@@ -1,0 +1,127 @@
+"""
+All 94 US federal district courts with coverage tier metadata.
+Coverage tiers: full | partial | limited
+"""
+
+FEDERAL_COURTS: dict[str, dict] = {
+    # California (full)
+    "cacd": {"label": "C.D. Cal. (Los Angeles)", "state": "CA", "coverage": "full"},
+    "cand": {"label": "N.D. Cal. (San Francisco)", "state": "CA", "coverage": "full"},
+    "caed": {"label": "E.D. Cal. (Sacramento)", "state": "CA", "coverage": "partial"},
+    "casd": {"label": "S.D. Cal. (San Diego)", "state": "CA", "coverage": "partial"},
+    # New York (full)
+    "nyed": {"label": "E.D.N.Y. (Brooklyn)", "state": "NY", "coverage": "full"},
+    "nysd": {"label": "S.D.N.Y. (Manhattan)", "state": "NY", "coverage": "full"},
+    "nynd": {"label": "N.D.N.Y. (Albany)", "state": "NY", "coverage": "partial"},
+    "nywd": {"label": "W.D.N.Y. (Buffalo)", "state": "NY", "coverage": "partial"},
+    # Texas (partial)
+    "txsd": {"label": "S.D. Tex. (Houston)", "state": "TX", "coverage": "partial"},
+    "txnd": {"label": "N.D. Tex. (Dallas)", "state": "TX", "coverage": "partial"},
+    "txed": {"label": "E.D. Tex. (Marshall)", "state": "TX", "coverage": "partial"},
+    "txwd": {"label": "W.D. Tex. (Austin)", "state": "TX", "coverage": "partial"},
+    # Florida (partial)
+    "flsd": {"label": "S.D. Fla. (Miami)", "state": "FL", "coverage": "partial"},
+    "flmd": {"label": "M.D. Fla. (Tampa)", "state": "FL", "coverage": "partial"},
+    "flnd": {"label": "N.D. Fla. (Tallahassee)", "state": "FL", "coverage": "partial"},
+    # Illinois (partial)
+    "ilnd": {"label": "N.D. Ill. (Chicago)", "state": "IL", "coverage": "partial"},
+    "ilcd": {"label": "C.D. Ill. (Springfield)", "state": "IL", "coverage": "limited"},
+    "ilsd": {"label": "S.D. Ill. (Benton)", "state": "IL", "coverage": "limited"},
+    # Georgia (partial)
+    "gand": {"label": "N.D. Ga. (Atlanta)", "state": "GA", "coverage": "partial"},
+    "gamd": {"label": "M.D. Ga. (Macon)", "state": "GA", "coverage": "limited"},
+    "gasd": {"label": "S.D. Ga. (Savannah)", "state": "GA", "coverage": "limited"},
+    # Pennsylvania (partial)
+    "paed": {"label": "E.D. Pa. (Philadelphia)", "state": "PA", "coverage": "partial"},
+    "pamd": {"label": "M.D. Pa. (Scranton)", "state": "PA", "coverage": "limited"},
+    "pawd": {"label": "W.D. Pa. (Pittsburgh)", "state": "PA", "coverage": "partial"},
+    # Washington (partial)
+    "wawd": {"label": "W.D. Wash. (Seattle)", "state": "WA", "coverage": "partial"},
+    "waed": {"label": "E.D. Wash. (Spokane)", "state": "WA", "coverage": "limited"},
+    # Colorado (partial)
+    "cod":  {"label": "D. Colo. (Denver)", "state": "CO", "coverage": "partial"},
+    # New Jersey (partial)
+    "njd":  {"label": "D.N.J. (Newark)", "state": "NJ", "coverage": "partial"},
+    # Massachusetts (partial)
+    "mad":  {"label": "D. Mass. (Boston)", "state": "MA", "coverage": "partial"},
+    # All remaining states — limited coverage
+    "ald":  {"label": "M.D. Ala. (Montgomery)", "state": "AL", "coverage": "limited"},
+    "alnd": {"label": "N.D. Ala. (Birmingham)", "state": "AL", "coverage": "limited"},
+    "alsd": {"label": "S.D. Ala. (Mobile)", "state": "AL", "coverage": "limited"},
+    "akd":  {"label": "D. Alaska (Anchorage)", "state": "AK", "coverage": "limited"},
+    "azd":  {"label": "D. Ariz. (Phoenix)", "state": "AZ", "coverage": "limited"},
+    "ared": {"label": "E.D. Ark. (Little Rock)", "state": "AR", "coverage": "limited"},
+    "arwd": {"label": "W.D. Ark. (Fort Smith)", "state": "AR", "coverage": "limited"},
+    "ctd":  {"label": "D. Conn. (New Haven)", "state": "CT", "coverage": "limited"},
+    "ded":  {"label": "D. Del. (Wilmington)", "state": "DE", "coverage": "limited"},
+    "dcd":  {"label": "D.D.C. (Washington DC)", "state": "DC", "coverage": "partial"},
+    "hid":  {"label": "D. Haw. (Honolulu)", "state": "HI", "coverage": "limited"},
+    "idd":  {"label": "D. Idaho (Boise)", "state": "ID", "coverage": "limited"},
+    "innd": {"label": "N.D. Ind. (Hammond)", "state": "IN", "coverage": "limited"},
+    "insd": {"label": "S.D. Ind. (Indianapolis)", "state": "IN", "coverage": "limited"},
+    "iand": {"label": "N.D. Iowa (Cedar Rapids)", "state": "IA", "coverage": "limited"},
+    "iasd": {"label": "S.D. Iowa (Des Moines)", "state": "IA", "coverage": "limited"},
+    "ksd":  {"label": "D. Kan. (Wichita)", "state": "KS", "coverage": "limited"},
+    "kyed": {"label": "E.D. Ky. (Lexington)", "state": "KY", "coverage": "limited"},
+    "kywd": {"label": "W.D. Ky. (Louisville)", "state": "KY", "coverage": "limited"},
+    "laed": {"label": "E.D. La. (New Orleans)", "state": "LA", "coverage": "limited"},
+    "lamd": {"label": "M.D. La. (Baton Rouge)", "state": "LA", "coverage": "limited"},
+    "lawd": {"label": "W.D. La. (Shreveport)", "state": "LA", "coverage": "limited"},
+    "med":  {"label": "D. Me. (Portland)", "state": "ME", "coverage": "limited"},
+    "mdd":  {"label": "D. Md. (Baltimore)", "state": "MD", "coverage": "limited"},
+    "mied": {"label": "E.D. Mich. (Detroit)", "state": "MI", "coverage": "limited"},
+    "miwd": {"label": "W.D. Mich. (Grand Rapids)", "state": "MI", "coverage": "limited"},
+    "mnd":  {"label": "D. Minn. (Minneapolis)", "state": "MN", "coverage": "limited"},
+    "msnd": {"label": "N.D. Miss. (Oxford)", "state": "MS", "coverage": "limited"},
+    "mssd": {"label": "S.D. Miss. (Jackson)", "state": "MS", "coverage": "limited"},
+    "moed": {"label": "E.D. Mo. (St. Louis)", "state": "MO", "coverage": "limited"},
+    "mowd": {"label": "W.D. Mo. (Kansas City)", "state": "MO", "coverage": "limited"},
+    "mtd":  {"label": "D. Mont. (Billings)", "state": "MT", "coverage": "limited"},
+    "ned":  {"label": "D. Neb. (Omaha)", "state": "NE", "coverage": "limited"},
+    "nvd":  {"label": "D. Nev. (Las Vegas)", "state": "NV", "coverage": "limited"},
+    "nhd":  {"label": "D.N.H. (Concord)", "state": "NH", "coverage": "limited"},
+    "nmd":  {"label": "D.N.M. (Albuquerque)", "state": "NM", "coverage": "limited"},
+    "nced": {"label": "E.D.N.C. (Raleigh)", "state": "NC", "coverage": "limited"},
+    "ncmd": {"label": "M.D.N.C. (Greensboro)", "state": "NC", "coverage": "limited"},
+    "ncwd": {"label": "W.D.N.C. (Charlotte)", "state": "NC", "coverage": "limited"},
+    "ndd":  {"label": "D.N.D. (Bismarck)", "state": "ND", "coverage": "limited"},
+    "ohnd": {"label": "N.D. Ohio (Cleveland)", "state": "OH", "coverage": "limited"},
+    "ohsd": {"label": "S.D. Ohio (Columbus)", "state": "OH", "coverage": "limited"},
+    "oked": {"label": "E.D. Okla. (Muskogee)", "state": "OK", "coverage": "limited"},
+    "oknd": {"label": "N.D. Okla. (Tulsa)", "state": "OK", "coverage": "limited"},
+    "okwd": {"label": "W.D. Okla. (Oklahoma City)", "state": "OK", "coverage": "limited"},
+    "ord":  {"label": "D. Or. (Portland)", "state": "OR", "coverage": "limited"},
+    "rid":  {"label": "D.R.I. (Providence)", "state": "RI", "coverage": "limited"},
+    "scd":  {"label": "D.S.C. (Columbia)", "state": "SC", "coverage": "limited"},
+    "sdd":  {"label": "D.S.D. (Sioux Falls)", "state": "SD", "coverage": "limited"},
+    "tned": {"label": "E.D. Tenn. (Knoxville)", "state": "TN", "coverage": "limited"},
+    "tnmd": {"label": "M.D. Tenn. (Nashville)", "state": "TN", "coverage": "limited"},
+    "tnwd": {"label": "W.D. Tenn. (Memphis)", "state": "TN", "coverage": "limited"},
+    "utd":  {"label": "D. Utah (Salt Lake City)", "state": "UT", "coverage": "limited"},
+    "vtd":  {"label": "D. Vt. (Burlington)", "state": "VT", "coverage": "limited"},
+    "vaed": {"label": "E.D. Va. (Alexandria)", "state": "VA", "coverage": "limited"},
+    "vawd": {"label": "W.D. Va. (Roanoke)", "state": "VA", "coverage": "limited"},
+    "wvnd": {"label": "N.D.W. Va. (Clarksburg)", "state": "WV", "coverage": "limited"},
+    "wvsd": {"label": "S.D.W. Va. (Charleston)", "state": "WV", "coverage": "limited"},
+    "wied": {"label": "E.D. Wis. (Milwaukee)", "state": "WI", "coverage": "limited"},
+    "wiwd": {"label": "W.D. Wis. (Madison)", "state": "WI", "coverage": "limited"},
+    "wyd":  {"label": "D. Wyo. (Cheyenne)", "state": "WY", "coverage": "limited"},
+    # Territories
+    "prd":  {"label": "D.P.R. (San Juan)", "state": "PR", "coverage": "limited"},
+    "vid":  {"label": "D.V.I. (St. Thomas)", "state": "VI", "coverage": "limited"},
+}
+
+# Primary federal court per state (used by venue optimizer for non-NY/CA cases)
+STATE_TO_PRIMARY_COURT: dict[str, str] = {
+    "AL": "alnd", "AK": "akd",  "AZ": "azd",  "AR": "ared", "CA": "cand",
+    "CO": "cod",  "CT": "ctd",  "DE": "ded",  "DC": "dcd",  "FL": "flsd",
+    "GA": "gand", "HI": "hid",  "ID": "idd",  "IL": "ilnd", "IN": "insd",
+    "IA": "iasd", "KS": "ksd",  "KY": "kywd", "LA": "laed", "ME": "med",
+    "MD": "mdd",  "MA": "mad",  "MI": "mied", "MN": "mnd",  "MS": "mssd",
+    "MO": "moed", "MT": "mtd",  "NE": "ned",  "NV": "nvd",  "NH": "nhd",
+    "NJ": "njd",  "NM": "nmd",  "NY": "nysd", "NC": "ncwd", "ND": "ndd",
+    "OH": "ohnd", "OK": "okwd", "OR": "ord",  "PA": "paed", "RI": "rid",
+    "SC": "scd",  "SD": "sdd",  "TN": "tnmd", "TX": "txsd", "UT": "utd",
+    "VT": "vtd",  "VA": "vaed", "WA": "wawd", "WV": "wvsd", "WI": "wied",
+    "WY": "wyd",  "PR": "prd",  "VI": "vid",
+}

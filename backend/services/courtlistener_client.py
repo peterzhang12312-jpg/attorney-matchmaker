@@ -57,18 +57,13 @@ log = structlog.get_logger()
 
 _BASE = "https://www.courtlistener.com/api/rest/v4"
 
-# Courts in scope for this integration
-SCOPED_COURTS: dict[str, str] = {
-    # California
-    "cacd":     "C.D. Cal. (Los Angeles)",
-    "cand":     "N.D. Cal. (San Francisco)",
-    "cal":      "California Supreme Court",
-    "calctapp": "California Court of Appeal",
-    # New York
-    "nyed":     "E.D.N.Y. (Brooklyn)",
-    "nysd":     "S.D.N.Y. (Manhattan)",
-    "ny":       "New York Court of Appeals",
-}
+# Courts in scope for this integration — all 94 federal districts + state courts
+from data.federal_courts import FEDERAL_COURTS as _FC
+SCOPED_COURTS: dict[str, str] = {k: v["label"] for k, v in _FC.items()}
+SCOPED_COURTS["cal"] = "California Supreme Court"
+SCOPED_COURTS["calctapp"] = "California Court of Appeal"
+SCOPED_COURTS["ny"] = "New York Court of Appeals"
+SCOPED_COURTS["nysupct"] = "New York Supreme Court"
 
 # Jurisdiction labels written onto each AttorneyProfile.
 # Multiple values give the scorer more surface area to find a match.
@@ -82,6 +77,11 @@ _COURT_JURISDICTIONS: dict[str, list[str]] = {
     "ny":       ["NY"],
     "nysupct":  ["NY", "New York Supreme Court"],
 }
+
+# Auto-generate jurisdiction labels for all federal courts not already mapped
+for _court_id, _court_info in _FC.items():
+    if _court_id not in _COURT_JURISDICTIONS:
+        _COURT_JURISDICTIONS[_court_id] = [_court_info["label"], _court_info["state"]]
 
 # County → CourtListener court IDs for NY Supreme Court (trial-level, all counties)
 _NY_COUNTY_COURTS: dict[str, list[str]] = {
