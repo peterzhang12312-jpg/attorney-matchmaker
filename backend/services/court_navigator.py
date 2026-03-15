@@ -39,9 +39,19 @@ _PCL_FIND = "https://pacer.uscourts.gov/pcl-public-api/rest/cases/find"
 # NYSCEF guest search URL template
 _NYSCEF_SEARCH = "https://iapps.courts.state.ny.us/nyscef/CaseSearch"
 
+# CA court search URL template (CourtListener)
+_CA_CL_SEARCH = "https://www.courtlistener.com/?q={name}&type=r&order_by=score+desc&stat_Precedential=on"
+
 # Court ID sets
 _NY_COURTS = {"nyed", "nysd", "nysupct", "ny"}
+_CA_COURTS = {"cacd", "cand", "cal", "calctapp"}
 _FEDERAL_COURTS = {"nyed", "nysd", "cacd", "cand"}
+
+
+def _build_ca_url(attorney_name: str) -> str:
+    """Build a CourtListener search URL for CA attorneys."""
+    import urllib.parse
+    return _CA_CL_SEARCH.format(name=urllib.parse.quote(attorney_name))
 
 
 def _cl_headers() -> dict[str, str]:
@@ -266,6 +276,7 @@ async def _verify_single_attorney(
     """Run CourtListener and/or PACER PCL searches for one attorney."""
     venue_lower = venue.lower()
     is_ny = venue_lower in _NY_COURTS or "ny" in venue_lower
+    is_ca = venue_lower in _CA_COURTS or "ca" in venue_lower
     is_federal = venue_lower in _FEDERAL_COURTS
 
     tasks: list = []
@@ -297,10 +308,12 @@ async def _verify_single_attorney(
         ))
         sources.append("pacer_pcl")
 
-    # Generate NYSCEF manual verification URL for NY venues
+    # Generate manual verification URL — NYSCEF for NY, CourtListener for CA
     nyscef_url: Optional[str] = None
     if is_ny:
         nyscef_url = _build_nyscef_url(attorney_name)
+    elif is_ca:
+        nyscef_url = _build_ca_url(attorney_name)
 
     now_iso = datetime.now(timezone.utc).isoformat()
 
@@ -401,6 +414,7 @@ async def verify_attorneys(
         log.warning("court_verification_timeout", timeout_s=10)
         now_iso = datetime.now(timezone.utc).isoformat()
         is_ny = venue.lower() in _NY_COURTS or "ny" in venue.lower()
+        is_ca = venue.lower() in _CA_COURTS or "ca" in venue.lower()
         return [
             CourtVerificationResult(
                 attorney_name=name,
@@ -408,7 +422,7 @@ async def verify_attorneys(
                 court_records=[],
                 source="none",
                 error="Verification timed out",
-                verification_url=_build_nyscef_url(name) if is_ny else None,
+                verification_url=_build_nyscef_url(name) if is_ny else (_build_ca_url(name) if is_ca else None),
                 checked_at=now_iso,
             )
             for name in attorney_names
@@ -417,6 +431,7 @@ async def verify_attorneys(
     final: list[CourtVerificationResult] = []
     now_iso = datetime.now(timezone.utc).isoformat()
     is_ny = venue.lower() in _NY_COURTS or "ny" in venue.lower()
+    is_ca = venue.lower() in _CA_COURTS or "ca" in venue.lower()
 
     for name, result in zip(attorney_names, results):
         if isinstance(result, Exception):
@@ -426,7 +441,7 @@ async def verify_attorneys(
                 court_records=[],
                 source="none",
                 error=str(result),
-                verification_url=_build_nyscef_url(name) if is_ny else None,
+                verification_url=_build_nyscef_url(name) if is_ny else (_build_ca_url(name) if is_ca else None),
                 checked_at=now_iso,
             ))
         else:

@@ -18,7 +18,12 @@ log = structlog.get_logger()
 
 router = APIRouter(prefix="/api", tags=["Leaderboard"])
 
-_VALID_DOMAINS = {"intellectual_property", "real_estate", "corporate", "employment"}
+_VALID_DOMAINS = {
+    "intellectual_property", "real_estate", "corporate", "employment",
+    "criminal_defense", "immigration", "bankruptcy", "personal_injury",
+    "landlord_tenant", "employment_employee", "estate_planning", "family_law",
+    "civil_litigation", "contract_dispute", "securities", "tax",
+}
 _VALID_JURISDICTIONS = {"CA", "NY", "CA+NY"}
 
 
