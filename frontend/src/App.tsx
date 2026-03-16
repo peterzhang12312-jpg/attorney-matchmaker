@@ -12,6 +12,7 @@ import LeaderboardView from "./components/LeaderboardView";
 import HeroSection from "./components/HeroSection";
 import AttorneyOnboard from "./components/AttorneyOnboard";
 import AttorneyDashboard from "./components/AttorneyDashboard";
+import TimelineCard from "./components/TimelineCard";
 
 export type Tab = "find" | "roster" | "leaderboard" | "attorney";
 
@@ -97,6 +98,8 @@ export default function App() {
                 recommendation={matchResult.venue_recommendation}
               />
             )}
+
+            <TimelineCard caseId={matchResult.case_id} />
 
             <ResultsSection
               matches={matchResult.matches}

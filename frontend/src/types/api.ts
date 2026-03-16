@@ -350,3 +350,20 @@ export interface CreditPurchaseResponse {
   credits: number;
   package_id: string;
 }
+
+/* ---------- AI Litigation Timeline ---------- */
+
+export interface LitigationTimelinePhase {
+  phase: string;
+  duration: string;
+  description: string;
+  key_actions: string[];
+}
+
+export interface LitigationTimeline {
+  practice_area: string;
+  jurisdiction: string;
+  total_estimated_duration: string;
+  phases: LitigationTimelinePhase[];
+  important_notes: string[];
+}
