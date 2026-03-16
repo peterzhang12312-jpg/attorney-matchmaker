@@ -210,14 +210,21 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                         match_count=len(candidates),
                     ))
 
+                # Only send leads for candidates with composite score >= 60
+                LEAD_SCORE_THRESHOLD = 60.0
+                qualified = [c for c in candidates if c.score_breakdown.composite >= LEAD_SCORE_THRESHOLD]
+
                 practice_area = analysis.primary_legal_area
                 jurisdiction = analysis.jurisdiction
-                top_names = [c.attorney.name for c in candidates[:3]]
+                qualified_names = [c.attorney.name for c in qualified]
 
-                if top_names:
+                # Build a score lookup by attorney name for the case_summary
+                score_by_name = {c.attorney.name: c.score_breakdown.composite for c in qualified}
+
+                if qualified_names:
                     result_q = await db.execute(
                         select(AttorneyRegistered).where(
-                            AttorneyRegistered.name.in_(top_names),
+                            AttorneyRegistered.name.in_(qualified_names),
                             AttorneyRegistered.accepting_clients == "true",
                         )
                     )
@@ -231,6 +238,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                                 "practice_area": practice_area,
                                 "urgency": client_urgency,
                                 "jurisdiction": jurisdiction,
+                                "match_score": round(score_by_name.get(atty.name, 0.0), 1),
                             },
                         )
                         db.add(lead)
