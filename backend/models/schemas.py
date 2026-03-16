@@ -596,6 +596,7 @@ class LeadSummary(BaseModel):
     practice_area: Optional[str]
     urgency: Optional[str]
     jurisdiction: Optional[str]
+    lead_score: Optional[float] = None
     sent_at: Optional[str]
     responded_at: Optional[str]
 

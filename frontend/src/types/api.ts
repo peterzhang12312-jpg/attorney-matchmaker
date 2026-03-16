@@ -276,6 +276,7 @@ export interface LeadSummary {
   practice_area?: string;
   urgency?: string;
   jurisdiction?: string;
+  lead_score?: number;
   sent_at?: string;
   responded_at?: string;
 }
