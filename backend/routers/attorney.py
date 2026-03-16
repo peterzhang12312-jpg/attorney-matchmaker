@@ -46,6 +46,38 @@ log = structlog.get_logger()
 router = APIRouter(prefix="/api/attorney", tags=["attorney"])
 
 
+async def _update_attorney_embedding(attorney_id: str) -> None:
+    """Fire-and-forget: generate and persist profile embedding."""
+    from db.session import AsyncSessionLocal
+    from db.models import AttorneyRegistered as _AR
+    from services.embeddings import generate_embedding, attorney_profile_text
+    from sqlalchemy import update as _update
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(_AR).where(_AR.id == attorney_id))
+            atty = result.scalar_one_or_none()
+            if not atty:
+                return
+            text_for_embedding = attorney_profile_text(
+                name=atty.name,
+                firm=atty.firm,
+                practice_areas=atty.practice_areas or [],
+                jurisdictions=atty.jurisdictions or [],
+            )
+            embedding = await generate_embedding(text_for_embedding)
+            if embedding:
+                await db.execute(
+                    _update(_AR)
+                    .where(_AR.id == attorney_id)
+                    .values(profile_embedding=embedding)
+                )
+                await db.commit()
+                log.info("attorney.embedding_updated", attorney_id=attorney_id)
+    except Exception as exc:
+        log.warning("attorney.embedding_failed", attorney_id=attorney_id, error=str(exc))
+
+
 # ---------------------------------------------------------------------------
 # Auth dependency
 # ---------------------------------------------------------------------------
@@ -153,6 +185,8 @@ async def register_attorney(
     await db.commit()
     await db.refresh(attorney)
 
+    asyncio.create_task(_update_attorney_embedding(attorney.id))
+
     token = create_token(attorney.id, attorney.email)
     log.info(
         "attorney_registered",
@@ -248,6 +282,7 @@ async def update_profile(
         )
         await db.commit()
         await db.refresh(attorney)
+        asyncio.create_task(_update_attorney_embedding(attorney.id))
 
     log.info("attorney_profile_updated", attorney_id=attorney.id, fields=list(updates.keys()))
     return _to_profile_response(attorney)
