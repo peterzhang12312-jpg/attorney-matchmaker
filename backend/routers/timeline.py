@@ -10,12 +10,17 @@ import os
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.queries import get_case
 from db.session import get_db
 from middleware.rate_limit import limiter
 from models.schemas import LitigationTimeline
+
+
+class TimelineRequest(BaseModel):
+    case_id: str
 
 log = structlog.get_logger()
 
@@ -57,11 +62,11 @@ Include realistic durations. Flag any statute of limitations concerns in importa
 @limiter.limit("10/minute")
 async def generate_timeline(
     request: Request,
-    body: dict,
+    body: TimelineRequest,
     db: AsyncSession = Depends(get_db),
 ) -> LitigationTimeline:
     """Generate a litigation timeline for a case."""
-    case_id = body.get("case_id", "")
+    case_id = body.case_id
     if not case_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -98,24 +103,36 @@ async def generate_timeline(
         from google import genai
 
         client = genai.Client(api_key=api_key)
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
+        loop = asyncio.get_running_loop()
+        response = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                ),
             ),
+            timeout=30.0,
         )
         raw = response.text.strip()
         # Strip markdown code fences if present
         if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
+            parts = raw.split("```", 2)
+            if len(parts) >= 2:
+                raw = parts[1]
+                if raw.lower().startswith("json"):
+                    raw = raw[4:]
+        raw = raw.strip()
         data = json.loads(raw)
         timeline = LitigationTimeline(**data)
         log.info("timeline.generated", case_id=case_id, phases=len(timeline.phases))
         return timeline
+    except asyncio.TimeoutError:
+        log.error("timeline.generation_timeout", case_id=case_id)
+        raise HTTPException(
+            status_code=504,
+            detail="Timeline generation timed out",
+        )
     except json.JSONDecodeError as exc:
         log.error("timeline.json_parse_error", case_id=case_id, error=str(exc))
         raise HTTPException(

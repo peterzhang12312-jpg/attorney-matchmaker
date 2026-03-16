@@ -38,7 +38,7 @@ async def generate_embedding(text: str) -> Optional[list[float]]:
         return None
     try:
         import asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
             lambda: client.models.embed_content(
@@ -58,6 +58,8 @@ async def generate_embedding(text: str) -> Optional[list[float]]:
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     """Cosine similarity between two vectors. Returns 0.0 on any error."""
     try:
+        if len(a) != len(b):
+            return 0.0
         dot = sum(x * y for x, y in zip(a, b))
         mag_a = math.sqrt(sum(x * x for x in a))
         mag_b = math.sqrt(sum(y * y for y in b))

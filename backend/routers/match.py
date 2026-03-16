@@ -226,7 +226,13 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                 from services.embeddings import generate_embedding, cosine_similarity, attorney_profile_text
 
                 case_text = f"{analysis.fact_summary}\n{' '.join(analysis.key_issues)}\nPractice area: {practice_area}\nJurisdiction: {jurisdiction}"
-                case_embedding = await generate_embedding(case_text)
+                try:
+                    case_embedding = await asyncio.wait_for(
+                        generate_embedding(case_text), timeout=15.0
+                    )
+                except asyncio.TimeoutError:
+                    log.warning("semantic_embedding_timeout")
+                    case_embedding = None
 
                 semantic_leads: dict[str, float] = {}  # attorney_id -> similarity score
                 if case_embedding:
@@ -240,6 +246,8 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                     for atty in all_registered:
                         if atty.name in qualified_names:
                             continue  # already in qualified pool
+                        if not atty.profile_embedding:
+                            continue
                         sim = cosine_similarity(case_embedding, atty.profile_embedding)
                         if sim >= SEMANTIC_SIMILARITY_THRESHOLD:
                             semantic_leads[atty.id] = round(sim * 100, 1)
@@ -254,6 +262,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                         )
                     )
                     registered = result_q.scalars().all()
+                    keyword_leads_created: list[AttorneyRegistered] = []
                     for atty in registered:
                         existing_lead = await db.execute(
                             select(Lead).where(
@@ -276,15 +285,17 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                             },
                         )
                         db.add(lead)
-                        asyncio.create_task(send_lead_to_attorney(
-                            attorney_email=atty.email,
-                            attorney_name=atty.name,
-                            practice_area=practice_area,
-                            urgency=client_urgency,
-                            jurisdiction=jurisdiction,
-                        ))
-                    if registered:
+                        keyword_leads_created.append(atty)
+                    if keyword_leads_created:
                         await db.commit()
+                        for atty in keyword_leads_created:
+                            asyncio.create_task(send_lead_to_attorney(
+                                attorney_email=atty.email,
+                                attorney_name=atty.name,
+                                practice_area=practice_area,
+                                urgency=client_urgency,
+                                jurisdiction=jurisdiction,
+                            ))
 
                 # ---- Persist leads: semantic expansion pool ----
                 if semantic_leads:
@@ -294,6 +305,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                         )
                     )
                     sem_attys = result_sem.scalars().all()
+                    sem_leads_created: list[AttorneyRegistered] = []
                     for atty in sem_attys:
                         existing_lead = await db.execute(
                             select(Lead).where(
@@ -316,15 +328,17 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                             },
                         )
                         db.add(lead)
-                        asyncio.create_task(send_lead_to_attorney(
-                            attorney_email=atty.email,
-                            attorney_name=atty.name,
-                            practice_area=practice_area,
-                            urgency=client_urgency,
-                            jurisdiction=jurisdiction,
-                        ))
-                    if sem_attys:
+                        sem_leads_created.append(atty)
+                    if sem_leads_created:
                         await db.commit()
+                        for atty in sem_leads_created:
+                            asyncio.create_task(send_lead_to_attorney(
+                                attorney_email=atty.email,
+                                attorney_name=atty.name,
+                                practice_area=practice_area,
+                                urgency=client_urgency,
+                                jurisdiction=jurisdiction,
+                            ))
             except Exception as exc:
                 log.warning("email_lead_creation_failed", error=str(exc))
 
