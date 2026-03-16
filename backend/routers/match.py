@@ -30,6 +30,8 @@ from services.venue_optimizer import recommend_venue
 
 log = structlog.get_logger()
 
+LEAD_SCORE_THRESHOLD = 60.0
+
 router = APIRouter(prefix="/api", tags=["matching"])
 
 
@@ -211,14 +213,11 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                     ))
 
                 # Only send leads for candidates with composite score >= 60
-                LEAD_SCORE_THRESHOLD = 60.0
                 qualified = [c for c in candidates if c.score_breakdown.composite >= LEAD_SCORE_THRESHOLD]
 
                 practice_area = analysis.primary_legal_area
                 jurisdiction = analysis.jurisdiction
                 qualified_names = [c.attorney.name for c in qualified]
-
-                # Build a score lookup by attorney name for the case_summary
                 score_by_name = {c.attorney.name: c.score_breakdown.composite for c in qualified}
 
                 if qualified_names:
@@ -230,6 +229,14 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                     )
                     registered = result_q.scalars().all()
                     for atty in registered:
+                        existing_lead = await db.execute(
+                            select(Lead).where(
+                                Lead.case_id == case_id,
+                                Lead.attorney_id == atty.id,
+                            )
+                        )
+                        if existing_lead.scalar_one_or_none():
+                            continue
                         lead = Lead(
                             case_id=case_id,
                             attorney_id=atty.id,
@@ -238,7 +245,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                                 "practice_area": practice_area,
                                 "urgency": client_urgency,
                                 "jurisdiction": jurisdiction,
-                                "match_score": round(score_by_name.get(atty.name, 0.0), 1),
+                                "match_score": round(score_by_name[atty.name], 1),
                             },
                         )
                         db.add(lead)
