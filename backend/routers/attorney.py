@@ -548,13 +548,49 @@ async def confirm_credit_purchase(
     if not pack:
         raise HTTPException(status_code=400, detail=f"Unknown package: {package_id}")
 
-    new_credits = (attorney.credits or 0) + pack["credits"]
+    # Idempotency: prevent double-crediting from retried requests
+    idempotency_key = f"credit_purchase:{payment_intent_id}"
+    try:
+        from services.job_store import _redis as _get_redis_sync
+        import asyncio
+        import functools
+
+        def _set_nx(key: str) -> bool:
+            """Set key with NX + 24h TTL. Returns True if key was newly set."""
+            r = _get_redis_sync()
+            return r.set(key, "1", nx=True, ex=86400)
+
+        already_processed = await asyncio.to_thread(functools.partial(_set_nx, idempotency_key))
+        if already_processed is None:
+            # Key already existed — this payment_intent_id was already processed
+            result = await db.execute(
+                select(AttorneyRegistered).where(AttorneyRegistered.id == attorney.id)
+            )
+            current_attorney = result.scalar_one()
+            log.info(
+                "credit_purchase_duplicate",
+                attorney_id=attorney.id,
+                payment_intent_id=payment_intent_id,
+            )
+            return {"credits": current_attorney.credits, "credits_added": 0}
+    except Exception:
+        log.warning("credit_purchase_idempotency_redis_unavailable", payment_intent_id=payment_intent_id)
+        # Redis unavailable — proceed without idempotency guard
+
+    # Atomic SQL increment to avoid race condition on stale in-memory credits
     await db.execute(
         update(AttorneyRegistered)
         .where(AttorneyRegistered.id == attorney.id)
-        .values(credits=new_credits)
+        .values(credits=AttorneyRegistered.credits + pack["credits"])
     )
     await db.commit()
+
+    # Re-fetch to get the authoritative new balance
+    result = await db.execute(
+        select(AttorneyRegistered).where(AttorneyRegistered.id == attorney.id)
+    )
+    updated_attorney = result.scalar_one()
+    new_credits = updated_attorney.credits
 
     log.info(
         "credits_purchased",
