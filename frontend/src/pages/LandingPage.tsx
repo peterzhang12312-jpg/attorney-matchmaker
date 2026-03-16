@@ -1,5 +1,6 @@
 import LandingNav from "../components/landing/LandingNav";
 import HeroBlock from "../components/landing/HeroBlock";
+import StatsBand from "../components/landing/StatsBand";
 import Testimonials from "../components/landing/Testimonials";
 import HowItWorks from "../components/landing/HowItWorks";
 import FeaturesGrid from "../components/landing/FeaturesGrid";
@@ -14,6 +15,7 @@ export default function LandingPage() {
       <LandingNav />
       <main>
         <HeroBlock />
+        <StatsBand />
         <Testimonials />
         <HowItWorks />
         <FeaturesGrid />
