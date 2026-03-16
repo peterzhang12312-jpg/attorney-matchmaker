@@ -144,6 +144,140 @@ function RevealForm({
 }
 
 // ---------------------------------------------------------------------------
+// CreditPurchaseModal — buy a credit pack via Stripe
+// ---------------------------------------------------------------------------
+
+function CreditPurchaseModal({
+  token,
+  onSuccess,
+  onCancel,
+}: {
+  token: string;
+  onSuccess: (newCredits: number) => void;
+  onCancel: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [selectedPack, setSelectedPack] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/attorney/credit-packages", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then(setPackages)
+      .catch(() => {});
+  }, [token]);
+
+  async function handlePurchase() {
+    if (!stripe || !elements || !selectedPack) return;
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/attorney/purchase-credits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ package_id: selectedPack }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { client_secret, credits: creditsToAdd, package_id } = await res.json();
+
+      const card = elements.getElement(CardElement);
+      if (!card) throw new Error("Card element not mounted");
+      const result = await stripe.confirmCardPayment(client_secret, {
+        payment_method: { card },
+      });
+      if (result.error) throw new Error(result.error.message);
+
+      const piId = result.paymentIntent?.id;
+      const confRes = await fetch(
+        `/api/attorney/confirm-credit-purchase?payment_intent_id=${piId}&package_id=${package_id}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!confRes.ok) throw new Error("Payment succeeded but credit grant failed");
+      const { credits } = await confRes.json();
+      onSuccess(credits);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Purchase failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30" onClick={onCancel} />
+      <div className="relative bg-[#FFFEF2] rounded-[10px] border border-[rgba(25,25,24,0.12)] p-6 w-full max-w-md">
+        <p className="font-mono text-[0.65rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] mb-1">
+          Buy Lead Credits
+        </p>
+        <p className="text-lg font-bold text-[#191918] mb-1">Choose a pack</p>
+        <p className="text-sm text-[rgba(25,25,24,0.55)] mb-4">
+          Each credit reveals one client's contact info instantly — no card re-entry.
+        </p>
+
+        <div className="space-y-2 mb-4">
+          {packages.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setSelectedPack(p.id)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-md border transition-colors text-left ${
+                selectedPack === p.id
+                  ? "border-[#FCAA2D] bg-[#FCAA2D]/5"
+                  : "border-[rgba(25,25,24,0.12)] bg-white hover:border-[rgba(25,25,24,0.3)]"
+              }`}
+            >
+              <div>
+                <p className="text-sm font-semibold text-[#191918]">{p.label}</p>
+                <p className="font-mono text-[0.6rem] text-[rgba(25,25,24,0.45)]">
+                  {p.per_credit}/credit
+                </p>
+              </div>
+              <p className="text-sm font-bold text-[#191918]">
+                ${(p.amount_cents / 100).toFixed(0)}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        {selectedPack && (
+          <div className="border border-[rgba(25,25,24,0.12)] rounded-md px-3 py-3 bg-white mb-4">
+            <CardElement
+              options={{ style: { base: { fontSize: "14px", color: "#191918" } } }}
+            />
+          </div>
+        )}
+
+        {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
+
+        <div className="flex gap-3">
+          <button
+            onClick={handlePurchase}
+            disabled={loading || !selectedPack}
+            className="flex-1 rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide min-h-[44px] disabled:opacity-50"
+          >
+            {loading ? "Processing..." : "Purchase Credits"}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main dashboard
 // ---------------------------------------------------------------------------
 
@@ -438,17 +572,38 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
                         </p>
                       </div>
                     ) : lead.status === "accepted" ? (
-                      <button
-                        onClick={() =>
-                          setRevealLead({
-                            id: lead.id,
-                            practiceArea: lead.practice_area || "civil_litigation",
-                          })
-                        }
-                        className="mt-2 w-full sm:w-auto rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.65rem] uppercase tracking-wide px-4 min-h-[36px]"
-                      >
-                        Reveal Client — {LEAD_PRICE_LABELS[lead.practice_area || ""] || "$25"}
-                      </button>
+                      <div className="flex gap-2 flex-wrap mt-3">
+                        {credits > 0 && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/attorney/leads/${lead.id}/reveal-with-credit`, {
+                                  method: "POST",
+                                  headers: { Authorization: `Bearer ${token}` },
+                                });
+                                if (!res.ok) throw new Error(await res.text());
+                                const contact = await res.json();
+                                setRevealedContacts((prev) => ({ ...prev, [lead.id]: contact }));
+                                setCredits((c) => Math.max(0, c - 1));
+                                setProfile((prev) =>
+                                  prev ? { ...prev, credits: Math.max(0, (prev.credits ?? 0) - 1) } : prev
+                                );
+                              } catch (e: unknown) {
+                                setError(e instanceof Error ? e.message : "Reveal failed");
+                              }
+                            }}
+                            className="rounded-md bg-[#191918] text-white font-mono text-[0.65rem] uppercase tracking-wide px-4 min-h-[44px] hover:opacity-90 transition-opacity"
+                          >
+                            Use 1 Credit
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setRevealLead({ id: lead.id, practiceArea: lead.practice_area || "" })}
+                          className="rounded-md border border-[rgba(25,25,24,0.12)] text-[#191918] font-mono text-[0.65rem] uppercase tracking-wide px-4 min-h-[44px] hover:border-[rgba(25,25,24,0.4)] transition-colors"
+                        >
+                          Pay by Card
+                        </button>
+                      </div>
                     ) : null}
                   </div>
 
@@ -490,6 +645,17 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
             setRevealLead(null);
           }}
           onCancel={() => setRevealLead(null)}
+        />
+      )}
+      {buyingCredits && (
+        <CreditPurchaseModal
+          token={token}
+          onSuccess={(newCredits) => {
+            setCredits(newCredits);
+            setProfile((prev) => prev ? { ...prev, credits: newCredits } : prev);
+            setBuyingCredits(false);
+          }}
+          onCancel={() => setBuyingCredits(false)}
         />
       )}
     </div>
