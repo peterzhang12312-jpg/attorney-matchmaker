@@ -189,3 +189,34 @@ async def send_lead_accepted_to_client(
         log.info("email.sent", template="lead_accepted", to=client_email)
     except Exception as exc:
         log.error("email.send_failed", template="lead_accepted", error=str(exc))
+
+
+async def send_match_followup(
+    to_email: str, case_id: str, match_count: int
+) -> None:
+    """7-day follow-up: case has matches but no attorney hired yet."""
+    if not to_email or not _can_send():
+        return
+
+    html = _wrap_html(f"""\
+<h2 style="margin:0 0 16px;font-size:20px;color:#191918;">Still Looking for an Attorney?</h2>
+<p>We found <strong>{match_count}</strong> attorney match{"es" if match_count != 1 else ""} for your case
+   a week ago, but it looks like you haven't connected with one yet.</p>
+<p>Your matches are still available -- attorneys are waiting to hear from you.</p>
+<p style="margin:24px 0;">
+  <a href="{APP_URL}" style="display:inline-block;padding:10px 24px;background-color:#FCAA2D;color:#191918;
+     text-decoration:none;border-radius:6px;font-family:monospace;font-size:12px;letter-spacing:1px;
+     text-transform:uppercase;font-weight:bold;">View Your Matches</a>
+</p>
+<p style="font-size:13px;color:rgba(25,25,24,0.45);">Case ID: {case_id}</p>""")
+
+    try:
+        resend.Emails.send({
+            "from": FROM_ADDRESS,
+            "to": [to_email],
+            "subject": "Your attorney matches are still waiting",
+            "html": html,
+        })
+        log.info("email.sent", template="match_followup", to=to_email, case_id=case_id)
+    except Exception as exc:
+        log.error("email.send_failed", template="match_followup", error=str(exc))

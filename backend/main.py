@@ -29,7 +29,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from middleware.logging_config import setup_logging
 from middleware.rate_limit import limiter
 from models.schemas import ErrorResponse, HealthResponse
-from routers import attorneys, attorney, intake, leaderboard, match, refine, linkedin_auth, case_lookup, stripe_webhook, jobs, coverage, dashboard
+from routers import attorneys, attorney, intake, leaderboard, match, refine, linkedin_auth, case_lookup, stripe_webhook, jobs, coverage, dashboard, cron
 
 # ---------------------------------------------------------------------------
 # Environment & logging
@@ -172,6 +172,7 @@ app.include_router(stripe_webhook.router)
 app.include_router(jobs.router)
 app.include_router(coverage.router)
 app.include_router(dashboard.router)
+app.include_router(cron.router)
 
 # Debug router -- only active when DEBUG=true in .env
 if os.getenv("DEBUG", "").lower() in ("true", "1"):
