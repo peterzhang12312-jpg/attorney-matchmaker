@@ -16,9 +16,12 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 
+import time
+
 import structlog
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Request
+from sqlalchemy import func, select
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -26,6 +29,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from db.models import AttorneyRegistered, Case, Lead
 from db.session import get_db
 from middleware.logging_config import setup_logging
 from middleware.rate_limit import limiter
@@ -202,23 +206,31 @@ async def health_check() -> HealthResponse:
 
 # --- Platform stats -----------------------------------------------------------
 
+_stats_cache: dict = {"data": None, "at": 0.0}
+STATS_TTL = 60.0  # seconds
+
 @app.get("/api/stats", tags=["system"], summary="Aggregate platform statistics")
-async def get_platform_stats(db=Depends(get_db)):
-    from sqlalchemy import func, select
-    from db.models import Case, AttorneyRegistered, Lead
+@limiter.limit("60/minute")
+async def get_platform_stats(request: Request, db=Depends(get_db)):
+    now = time.monotonic()
+    if _stats_cache["data"] and now - _stats_cache["at"] < STATS_TTL:
+        return _stats_cache["data"]
 
     cases_count = await db.scalar(select(func.count()).select_from(Case))
     attorneys_count = await db.scalar(select(func.count()).select_from(AttorneyRegistered))
     leads_accepted = await db.scalar(
         select(func.count()).select_from(Lead).where(Lead.status == "accepted")
     )
-    return {
+    data = {
         "cases_analyzed": int(cases_count or 0),
         "attorneys_registered": int(attorneys_count or 0),
         "leads_accepted": int(leads_accepted or 0),
         "practice_areas": 16,
         "jurisdictions": 9,
     }
+    _stats_cache["data"] = data
+    _stats_cache["at"] = now
+    return data
 
 
 # --- Global exception handler ---------------------------------------------

@@ -28,7 +28,7 @@ function useCountUp(target: number, duration = 1200): number {
 function StatItem({ value, label }: { value: number; label: string }) {
   const animated = useCountUp(value);
   return (
-    <div className="flex flex-col items-center gap-1 px-6 py-4">
+    <div className="flex flex-col items-center gap-1 px-6 py-4 bg-white">
       <span className="font-mono text-2xl sm:text-3xl font-bold text-[#191918]">
         {animated > 0 ? animated.toLocaleString() : "\u2014"}
       </span>
@@ -52,7 +52,7 @@ export default function StatsBand() {
   return (
     <section className="bg-white border-y border-[rgba(25,25,24,0.12)]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2">
-        <div className="flex flex-wrap justify-center divide-x divide-[rgba(25,25,24,0.08)]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[rgba(25,25,24,0.08)]">
           <StatItem value={stats?.cases_analyzed ?? 0} label="Cases Analyzed" />
           <StatItem value={stats?.attorneys_registered ?? 0} label="Attorneys Registered" />
           <StatItem value={stats?.practice_areas ?? 16} label="Practice Areas" />
