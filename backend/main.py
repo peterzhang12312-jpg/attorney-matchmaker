@@ -123,6 +123,18 @@ async def lifespan(app: FastAPI):
     except Exception as _exc:
         log.warning("db_migration_credits_column_skipped", reason=str(_exc))
 
+    # Column migration: add profile_embedding to attorneys_registered
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS profile_embedding JSON"
+            ))
+        log.info("db_migration_profile_embedding_ok")
+    except Exception as _exc:
+        log.warning("db_migration_profile_embedding_skipped", reason=str(_exc))
+
     log.info("startup_complete", app="Fact-Pattern Attorney Matchmaker")
     yield
     # --- Shutdown ----------------------------------------------------------
