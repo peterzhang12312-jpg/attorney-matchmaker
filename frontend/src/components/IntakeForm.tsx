@@ -487,7 +487,12 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
                 onChange={(e) => dispatch({ type: "SET_CLIENT_EMAIL", payload: e.target.value })}
                 className="w-full rounded-xl bg-white border border-[rgba(25,25,24,0.12)] px-4 py-3 text-sm text-[#191918] placeholder-[rgba(25,25,24,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FCAA2D]/30 focus:border-[#FCAA2D]"
               />
-              <p className="text-xs text-[rgba(25,25,24,0.45)] mt-1">We'll notify you when matches are ready.</p>
+              {client_email.trim() && !isValidEmail && (
+                <p className="text-xs text-red-400 mt-1">Enter a valid email address.</p>
+              )}
+              {(!client_email.trim() || isValidEmail) && (
+                <p className="text-xs text-[rgba(25,25,24,0.45)] mt-1">We'll notify you when matches are ready.</p>
+              )}
             </div>
 
             <div className="mb-6">
