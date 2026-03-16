@@ -120,3 +120,55 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> Optional[dict]:
     except stripe.error.SignatureVerificationError as exc:
         log.warning("stripe_webhook_signature_invalid", error=str(exc))
         return None
+
+
+# ---------------------------------------------------------------------------
+# Credit packs
+# ---------------------------------------------------------------------------
+
+CREDIT_PACKAGES: list[dict] = [
+    {"id": "pack_2",  "credits": 2,  "amount_cents": 10000, "label": "Starter — 2 credits",  "per_credit": "$50"},
+    {"id": "pack_5",  "credits": 5,  "amount_cents": 20000, "label": "Value — 5 credits",     "per_credit": "$40"},
+    {"id": "pack_15", "credits": 15, "amount_cents": 50000, "label": "Pro — 15 credits",      "per_credit": "$33"},
+]
+
+_PACK_INDEX: dict[str, dict] = {p["id"]: p for p in CREDIT_PACKAGES}
+
+
+def get_credit_package(package_id: str) -> dict | None:
+    """Return a credit package dict by id, or None if not found."""
+    return _PACK_INDEX.get(package_id)
+
+
+async def create_credit_purchase_intent(
+    package_id: str,
+    attorney_id: str,
+) -> str:
+    """
+    Create a Stripe PaymentIntent for a credit pack purchase.
+    Returns the client_secret.
+    """
+    import asyncio
+    import functools
+
+    pack = get_credit_package(package_id)
+    if not pack:
+        raise ValueError(f"Unknown package_id: {package_id}")
+
+    sc = _client()
+    pi = await asyncio.to_thread(
+        functools.partial(
+            sc.payment_intents.create,
+            amount=pack["amount_cents"],
+            currency="usd",
+            metadata={
+                "type": "credit_purchase",
+                "attorney_id": attorney_id,
+                "package_id": package_id,
+                "credits": pack["credits"],
+            },
+            description=f"Credit pack: {pack['label']}",
+        )
+    )
+    log.info("credit_purchase_intent_created", attorney_id=attorney_id, package_id=package_id)
+    return pi.client_secret

@@ -585,6 +585,7 @@ class AttorneyProfileResponse(BaseModel):
     availability: str
     accepting_clients: bool
     is_founding: bool
+    credits: int = 0
     created_at: Optional[str]
 
 
@@ -686,3 +687,29 @@ class LeadContactInfo(BaseModel):
     practice_area: Optional[str] = None
     urgency: Optional[str] = None
     jurisdiction: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Credit pack schemas
+# ---------------------------------------------------------------------------
+
+class CreditPackage(BaseModel):
+    """A purchasable credit bundle."""
+    id: str
+    credits: int
+    amount_cents: int
+    label: str
+    per_credit: str
+
+
+class CreditPurchaseRequest(BaseModel):
+    """Request body for POST /api/attorney/purchase-credits."""
+    package_id: str
+
+
+class CreditPurchaseResponse(BaseModel):
+    """Returned when a credit purchase PaymentIntent is created."""
+    client_secret: str
+    amount_cents: int
+    credits: int
+    package_id: str
