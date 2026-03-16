@@ -25,12 +25,21 @@ from models.schemas import (
     AttorneyProfileResponse,
     AttorneyProfileUpdate,
     AttorneyRegisterRequest,
+    CreditPackage,
+    CreditPurchaseRequest,
+    CreditPurchaseResponse,
     LeadContactInfo,
     LeadRespondRequest,
     LeadRevealResponse,
     LeadSummary,
 )
-from services.billing import create_payment_intent, get_lead_price, verify_payment_succeeded
+from services.billing import (
+    create_credit_purchase_intent,
+    create_payment_intent,
+    get_credit_package,
+    get_lead_price,
+    verify_payment_succeeded,
+)
 
 log = structlog.get_logger()
 
@@ -88,6 +97,7 @@ def _to_profile_response(atty: AttorneyRegistered) -> AttorneyProfileResponse:
         availability=atty.availability or "available",
         accepting_clients=atty.accepting_clients == "true",
         is_founding=atty.is_founding == "true",
+        credits=atty.credits or 0,
         created_at=atty.created_at.isoformat() if atty.created_at else None,
     )
 
@@ -457,6 +467,161 @@ async def confirm_lead_reveal(
     await db.commit()
 
     log.info("lead_revealed", lead_id=lead_id, attorney_id=attorney.id)
+
+    summary = lead.case_summary or {}
+    return LeadContactInfo(
+        client_name=contact.get("name"),
+        client_email=contact.get("email"),
+        practice_area=summary.get("practice_area"),
+        urgency=summary.get("urgency"),
+        jurisdiction=summary.get("jurisdiction"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/attorney/credit-packages
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/credit-packages",
+    response_model=list[CreditPackage],
+    summary="List available credit packages",
+)
+async def list_credit_packages(
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+) -> list[CreditPackage]:
+    from services.billing import CREDIT_PACKAGES
+    return [CreditPackage(**p) for p in CREDIT_PACKAGES]
+
+
+# ---------------------------------------------------------------------------
+# POST /api/attorney/purchase-credits
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/purchase-credits",
+    response_model=CreditPurchaseResponse,
+    summary="Create a Stripe PaymentIntent for a credit pack purchase",
+)
+@limiter.limit("10/minute")
+async def initiate_credit_purchase(
+    request: Request,
+    body: CreditPurchaseRequest,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+) -> CreditPurchaseResponse:
+    pack = get_credit_package(body.package_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail=f"Unknown package: {body.package_id}")
+
+    client_secret = await create_credit_purchase_intent(
+        package_id=body.package_id,
+        attorney_id=attorney.id,
+    )
+    return CreditPurchaseResponse(
+        client_secret=client_secret,
+        amount_cents=pack["amount_cents"],
+        credits=pack["credits"],
+        package_id=body.package_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/attorney/confirm-credit-purchase
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/confirm-credit-purchase",
+    summary="Verify payment and credit the attorney's account",
+)
+@limiter.limit("10/minute")
+async def confirm_credit_purchase(
+    request: Request,
+    payment_intent_id: str,
+    package_id: str,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not await verify_payment_succeeded(payment_intent_id):
+        raise HTTPException(status_code=402, detail="Payment not confirmed")
+
+    pack = get_credit_package(package_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail=f"Unknown package: {package_id}")
+
+    new_credits = (attorney.credits or 0) + pack["credits"]
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney.id)
+        .values(credits=new_credits)
+    )
+    await db.commit()
+
+    log.info(
+        "credits_purchased",
+        attorney_id=attorney.id,
+        package_id=package_id,
+        credits_added=pack["credits"],
+        new_balance=new_credits,
+    )
+    return {"credits": new_credits, "credits_added": pack["credits"]}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/attorney/leads/{lead_id}/reveal-with-credit
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/leads/{lead_id}/reveal-with-credit",
+    response_model=LeadContactInfo,
+    summary="Reveal client contact using 1 credit (no card needed)",
+)
+@limiter.limit("10/minute")
+async def reveal_lead_with_credit(
+    request: Request,
+    lead_id: str,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+) -> LeadContactInfo:
+    result = await db.execute(
+        select(Lead, Case).join(Case, Lead.case_id == Case.case_id).where(
+            Lead.id == lead_id,
+            Lead.attorney_id == attorney.id,
+        )
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    lead, case = row
+
+    if lead.revealed_at:
+        raise HTTPException(status_code=409, detail="Lead already revealed")
+
+    if (attorney.credits or 0) < 1:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
+    new_credits = (attorney.credits or 0) - 1
+    now = datetime.now(timezone.utc)
+    contact = {"name": None, "email": case.client_email}
+
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney.id)
+        .values(credits=new_credits)
+    )
+    await db.execute(
+        update(Lead)
+        .where(Lead.id == lead_id)
+        .values(status="revealed", revealed_at=now, client_contact=contact)
+    )
+    await db.commit()
+
+    log.info(
+        "lead_revealed_with_credit",
+        lead_id=lead_id,
+        attorney_id=attorney.id,
+        credits_remaining=new_credits,
+    )
 
     summary = lead.case_summary or {}
     return LeadContactInfo(
