@@ -723,3 +723,24 @@ class CreditPurchaseResponse(BaseModel):
     amount_cents: int
     credits: int
     package_id: str
+
+
+# ---------------------------------------------------------------------------
+# AI-generated litigation timeline schemas
+# ---------------------------------------------------------------------------
+
+class LitigationTimelinePhase(BaseModel):
+    """A single phase in an AI-generated litigation timeline."""
+    phase: str
+    duration: str
+    description: str
+    key_actions: list[str]
+
+
+class LitigationTimeline(BaseModel):
+    """Full AI-generated litigation timeline for a case."""
+    practice_area: str
+    jurisdiction: str
+    total_estimated_duration: str
+    phases: list[LitigationTimelinePhase]
+    important_notes: list[str]
