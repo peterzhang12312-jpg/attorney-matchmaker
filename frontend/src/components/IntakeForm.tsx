@@ -82,6 +82,7 @@ interface IntakeFormState {
   proceduralPosture: string;
   primaryRemedy: string;
   evasiveDefendant: boolean;
+  client_email: string;
 }
 
 type IntakeFormAction =
@@ -92,6 +93,7 @@ type IntakeFormAction =
   | { type: "SET_BUDGET_GOAL"; payload: { key: keyof BudgetGoalsFormState; value: string } }
   | { type: "SET_ADVANCED_MODE"; payload: boolean }
   | { type: "SET_ADVANCED_FIELD"; payload: { key: keyof AdvancedSearchState; value: string | boolean } }
+  | { type: "SET_CLIENT_EMAIL"; payload: string }
   | { type: "SKIP_TO_BUDGET" }
   | { type: "NEXT_STEP" }
   | { type: "PREV_STEP" }
@@ -115,6 +117,7 @@ const INITIAL_STATE: IntakeFormState = {
   proceduralPosture: "",
   primaryRemedy: "",
   evasiveDefendant: false,
+  client_email: "",
 };
 
 /* ------------------------------------------------------------------ */
@@ -136,6 +139,7 @@ function persistToSession(state: IntakeFormState): void {
     sessionStorage.setItem(`${SS_PREFIX}proceduralPosture`, state.proceduralPosture);
     sessionStorage.setItem(`${SS_PREFIX}primaryRemedy`, state.primaryRemedy);
     sessionStorage.setItem(`${SS_PREFIX}evasiveDefendant`, String(state.evasiveDefendant));
+    sessionStorage.setItem(`${SS_PREFIX}client_email`, state.client_email);
     // facts excluded for PII reasons
   } catch { /* quota or private browsing */ }
 }
@@ -173,6 +177,8 @@ function restoreFromSession(): Partial<IntakeFormState> {
     if (pr) restored.primaryRemedy = pr;
     const evRaw = sessionStorage.getItem(`${SS_PREFIX}evasiveDefendant`);
     if (evRaw === "true") restored.evasiveDefendant = true;
+    const ceRaw = sessionStorage.getItem(`${SS_PREFIX}client_email`);
+    if (ceRaw) restored.client_email = ceRaw;
     return restored;
   } catch {
     return {};
@@ -185,7 +191,7 @@ function clearSession(): void {
       "step", "urgency", "refinementAnswers", "budgetGoals",
       "advancedMode", "subjectMatterJurisdiction", "venueCourt",
       "personalJurisdictionBasis", "proceduralPosture", "primaryRemedy",
-      "evasiveDefendant",
+      "evasiveDefendant", "client_email",
     ].forEach((k) => sessionStorage.removeItem(`${SS_PREFIX}${k}`));
   } catch { /* noop */ }
 }
@@ -211,6 +217,8 @@ function intakeReducer(state: IntakeFormState, action: IntakeFormAction): Intake
       next = { ...state, advancedMode: action.payload }; break;
     case "SET_ADVANCED_FIELD":
       next = { ...state, [action.payload.key]: action.payload.value } as IntakeFormState; break;
+    case "SET_CLIENT_EMAIL":
+      next = { ...state, client_email: action.payload }; break;
     case "SKIP_TO_BUDGET":
       next = { ...state, step: 3 as Step }; break;
     case "NEXT_STEP":
@@ -319,6 +327,7 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
     step, facts, urgency, refinementQuestions, refinementAnswers, budgetGoals,
     advancedMode, subjectMatterJurisdiction, venueCourt,
     personalJurisdictionBasis, proceduralPosture, primaryRemedy, evasiveDefendant,
+    client_email,
   } = state;
 
   const advancedValues: AdvancedSearchState = {
@@ -330,7 +339,8 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
     evasiveDefendant,
   };
 
-  const canAdvanceStep1 = facts.trim().length >= 20;
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(client_email.trim());
+  const canAdvanceStep1 = facts.trim().length >= 20 && isValidEmail;
   const truncatedFacts = facts.length > 200 ? `${facts.slice(0, 200)}...` : facts;
 
   /* ---- AI Refinement (Step 1 -> 2) ---- */
@@ -361,6 +371,7 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
         description: fullDescription,
         urgency,
         budget_goals: parseBudgetGoals(budgetGoals),
+        client_email: client_email.trim() || undefined,
         ...(advancedMode && {
           jurisdiction: venueCourt || undefined,
           subject_matter_jurisdiction: subjectMatterJurisdiction || undefined,
@@ -463,6 +474,20 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
                   : "Ready to proceed"}
               </span>
               <span>{facts.length.toLocaleString()} / 10,000</span>
+            </div>
+
+            <div className="mb-6">
+              <label className="block font-mono text-[0.68rem] text-[rgba(25,25,24,0.45)] uppercase tracking-widest mb-2">
+                Your Email <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={client_email}
+                onChange={(e) => dispatch({ type: "SET_CLIENT_EMAIL", payload: e.target.value })}
+                className="w-full rounded-xl bg-white border border-[rgba(25,25,24,0.12)] px-4 py-3 text-sm text-[#191918] placeholder-[rgba(25,25,24,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FCAA2D]/30 focus:border-[#FCAA2D]"
+              />
+              <p className="text-xs text-[rgba(25,25,24,0.45)] mt-1">We'll notify you when matches are ready.</p>
             </div>
 
             <div className="mb-6">

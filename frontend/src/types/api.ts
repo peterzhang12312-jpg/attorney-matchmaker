@@ -14,6 +14,7 @@ export interface IntakeRequest {
   description: string;
   urgency?: "low" | "medium" | "high" | "critical";
   budget_goals?: BudgetGoals;
+  client_email?: string;
   subject_matter_jurisdiction?: string;
   personal_jurisdiction_basis?: string;
   procedural_posture?: string;
