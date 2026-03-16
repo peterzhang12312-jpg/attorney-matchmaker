@@ -147,6 +147,16 @@ class CaseIntakeRequest(BaseModel):
     advanced_mode: bool = Field(False, description="True when submitted via advanced intake grid.")
     client_email: Optional[str] = Field(None, description="Client email for match notifications (optional).")
 
+    @field_validator("client_email", mode="before")
+    @classmethod
+    def validate_client_email(cls, v):
+        if v is None:
+            return v
+        v = str(v).strip()
+        if v and "@" not in v:
+            raise ValueError("Invalid email address")
+        return v or None
+
 
 class MatchRequest(BaseModel):
     """Trigger the full matching pipeline for a previously-submitted case."""
