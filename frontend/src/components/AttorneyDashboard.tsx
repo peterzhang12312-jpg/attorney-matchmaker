@@ -38,6 +38,13 @@ const STATUS_COLORS: Record<string, string> = {
   revealed: "bg-purple-100 text-purple-700 border-purple-200",
 };
 
+function scoreColor(score?: number): string {
+  if (!score) return "bg-gray-100 text-gray-500 border-gray-200";
+  if (score >= 80) return "bg-green-100 text-green-700 border-green-200";
+  if (score >= 60) return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-gray-100 text-gray-500 border-gray-200";
+}
+
 // ---------------------------------------------------------------------------
 // RevealForm — inline Stripe Card payment modal
 // ---------------------------------------------------------------------------
@@ -363,6 +370,13 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
                       {lead.practice_area && (
                         <span className="text-sm font-medium text-[#191918]">
                           {lead.practice_area}
+                        </span>
+                      )}
+                      {lead.lead_score != null && (
+                        <span
+                          className={`font-mono text-[0.6rem] uppercase px-2 py-0.5 rounded border ${scoreColor(lead.lead_score)}`}
+                        >
+                          {lead.lead_score}% match
                         </span>
                       )}
                       {lead.urgency && (
