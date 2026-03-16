@@ -31,6 +31,7 @@ from services.venue_optimizer import recommend_venue
 log = structlog.get_logger()
 
 LEAD_SCORE_THRESHOLD = 60.0
+SEMANTIC_SIMILARITY_THRESHOLD = 0.75  # cosine similarity >= 0.75 triggers semantic lead
 
 router = APIRouter(prefix="/api", tags=["matching"])
 
@@ -212,7 +213,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                         match_count=len(candidates),
                     ))
 
-                # Only send leads for candidates with composite score >= 60
+                # ---- Lead creation: CourtListener-qualified candidates ----
                 qualified = [c for c in candidates if c.score_breakdown.composite >= LEAD_SCORE_THRESHOLD]
 
                 practice_area = analysis.primary_legal_area
@@ -220,6 +221,31 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                 qualified_names = [c.attorney.name for c in qualified]
                 score_by_name = {c.attorney.name: c.score_breakdown.composite for c in qualified}
 
+                # ---- Semantic expansion: also send leads to registered attorneys ----
+                # with high profile similarity even if not in CourtListener results
+                from services.embeddings import generate_embedding, cosine_similarity, attorney_profile_text
+
+                case_text = f"{analysis.fact_summary}\n{' '.join(analysis.key_issues)}\nPractice area: {practice_area}\nJurisdiction: {jurisdiction}"
+                case_embedding = await generate_embedding(case_text)
+
+                semantic_leads: dict[str, float] = {}  # attorney_id -> similarity score
+                if case_embedding:
+                    result_all = await db.execute(
+                        select(AttorneyRegistered).where(
+                            AttorneyRegistered.accepting_clients == "true",
+                            AttorneyRegistered.profile_embedding.isnot(None),
+                        )
+                    )
+                    all_registered = result_all.scalars().all()
+                    for atty in all_registered:
+                        if atty.name in qualified_names:
+                            continue  # already in qualified pool
+                        sim = cosine_similarity(case_embedding, atty.profile_embedding)
+                        if sim >= SEMANTIC_SIMILARITY_THRESHOLD:
+                            semantic_leads[atty.id] = round(sim * 100, 1)
+                            log.info("semantic_lead_candidate", attorney=atty.name, similarity=sim)
+
+                # ---- Persist leads: CourtListener pool ----
                 if qualified_names:
                     result_q = await db.execute(
                         select(AttorneyRegistered).where(
@@ -246,6 +272,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                                 "urgency": client_urgency,
                                 "jurisdiction": jurisdiction,
                                 "match_score": round(score_by_name[atty.name], 1),
+                                "match_source": "keyword",
                             },
                         )
                         db.add(lead)
@@ -257,6 +284,46 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                             jurisdiction=jurisdiction,
                         ))
                     if registered:
+                        await db.commit()
+
+                # ---- Persist leads: semantic expansion pool ----
+                if semantic_leads:
+                    result_sem = await db.execute(
+                        select(AttorneyRegistered).where(
+                            AttorneyRegistered.id.in_(list(semantic_leads.keys()))
+                        )
+                    )
+                    sem_attys = result_sem.scalars().all()
+                    for atty in sem_attys:
+                        existing_lead = await db.execute(
+                            select(Lead).where(
+                                Lead.case_id == case_id,
+                                Lead.attorney_id == atty.id,
+                            )
+                        )
+                        if existing_lead.scalar_one_or_none():
+                            continue
+                        lead = Lead(
+                            case_id=case_id,
+                            attorney_id=atty.id,
+                            status="sent",
+                            case_summary={
+                                "practice_area": practice_area,
+                                "urgency": client_urgency,
+                                "jurisdiction": jurisdiction,
+                                "match_score": semantic_leads[atty.id],
+                                "match_source": "semantic",
+                            },
+                        )
+                        db.add(lead)
+                        asyncio.create_task(send_lead_to_attorney(
+                            attorney_email=atty.email,
+                            attorney_name=atty.name,
+                            practice_area=practice_area,
+                            urgency=client_urgency,
+                            jurisdiction=jurisdiction,
+                        ))
+                    if sem_attys:
                         await db.commit()
             except Exception as exc:
                 log.warning("email_lead_creation_failed", error=str(exc))
