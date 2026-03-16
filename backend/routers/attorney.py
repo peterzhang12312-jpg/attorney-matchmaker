@@ -271,6 +271,7 @@ async def list_leads(
             practice_area=lead.case_summary.get("practice_area") if lead.case_summary else None,
             urgency=lead.case_summary.get("urgency") if lead.case_summary else None,
             jurisdiction=lead.case_summary.get("jurisdiction") if lead.case_summary else None,
+            lead_score=lead.case_summary.get("match_score") if lead.case_summary else None,
             sent_at=lead.sent_at.isoformat() if lead.sent_at else None,
             responded_at=lead.responded_at.isoformat() if lead.responded_at else None,
         )
@@ -350,6 +351,7 @@ async def respond_to_lead(
         practice_area=lead.case_summary.get("practice_area") if lead.case_summary else None,
         urgency=lead.case_summary.get("urgency") if lead.case_summary else None,
         jurisdiction=lead.case_summary.get("jurisdiction") if lead.case_summary else None,
+        lead_score=lead.case_summary.get("match_score") if lead.case_summary else None,
         sent_at=lead.sent_at.isoformat() if lead.sent_at else None,
         responded_at=lead.responded_at.isoformat() if lead.responded_at else None,
     )
