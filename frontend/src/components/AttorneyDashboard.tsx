@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getAttorneyProfile, getAttorneyLeads, respondToLead } from "../api/client";
-import type { AttorneyProfile, LeadSummary } from "../types/api";
+import type { AttorneyProfile, CreditPackage, LeadSummary } from "../types/api";
 import { Award, ChevronDown, ChevronUp, Clock } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
@@ -166,6 +166,8 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
   const [revealedContacts, setRevealedContacts] = useState<
     Record<string, { client_email?: string }>
   >({});
+  const [buyingCredits, setBuyingCredits] = useState(false);
+  const [credits, setCredits] = useState<number>(0);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -176,6 +178,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
         getAttorneyLeads(token),
       ]);
       setProfile(p);
+      setCredits(p.credits ?? 0);
       setLeads(l);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load dashboard";
@@ -238,14 +241,31 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
               </span>
             </span>
           )}
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-[rgba(25,25,24,0.12)] rounded-md">
+            <span className="font-mono text-[0.65rem] uppercase tracking-wide text-[rgba(25,25,24,0.45)]">
+              Credits:
+            </span>
+            <span className="font-mono text-[0.75rem] font-semibold text-[#191918]">
+              {credits}
+            </span>
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="min-h-[44px] px-4 rounded-md border border-[rgba(25,25,24,0.12)] text-[rgba(25,25,24,0.45)] font-mono text-[0.7rem] uppercase tracking-wide hover:text-[#191918] hover:border-[rgba(25,25,24,0.3)] transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setBuyingCredits(true)}
+            className="min-h-[44px] px-4 rounded-md bg-[#FCAA2D] text-[#191918] font-mono text-[0.7rem] uppercase tracking-wide hover:opacity-90 transition-opacity"
+          >
+            Buy Credits
+          </button>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="min-h-[44px] px-4 rounded-md border border-[rgba(25,25,24,0.12)] text-[rgba(25,25,24,0.45)] font-mono text-[0.7rem] uppercase tracking-wide hover:text-[#191918] hover:border-[rgba(25,25,24,0.3)] transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {error && (

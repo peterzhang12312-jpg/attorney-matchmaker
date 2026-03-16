@@ -266,6 +266,7 @@ export interface AttorneyProfile {
   availability: string;
   accepting_clients: boolean;
   is_founding: boolean;
+  credits?: number;
   created_at?: string;
 }
 
@@ -332,4 +333,19 @@ export interface CaseLookupResponse {
   similarity?: SimilarityAnalysis;
   extracted_practice_area: string;
   extracted_venue: string;
+}
+
+export interface CreditPackage {
+  id: string;
+  credits: number;
+  amount_cents: number;
+  label: string;
+  per_credit: string;
+}
+
+export interface CreditPurchaseResponse {
+  client_secret: string;
+  amount_cents: number;
+  credits: number;
+  package_id: string;
 }
