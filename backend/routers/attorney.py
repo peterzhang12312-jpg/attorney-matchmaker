@@ -548,20 +548,20 @@ async def confirm_credit_purchase(
     if not pack:
         raise HTTPException(status_code=400, detail=f"Unknown package: {package_id}")
 
-    # Idempotency: prevent double-crediting from retried requests
+    # Idempotency check (Step A): if this payment_intent was already processed, return early
     idempotency_key = f"credit_purchase:{payment_intent_id}"
+    _redis_client = None
     try:
+        import functools as _functools
         from services.job_store import _redis as _get_redis_sync
-        import asyncio
-        import functools
 
-        def _set_nx(key: str) -> bool:
-            """Set key with NX + 24h TTL. Returns True if key was newly set."""
-            r = _get_redis_sync()
-            return r.set(key, "1", nx=True, ex=86400)
+        _redis_client = _get_redis_sync()
 
-        already_processed = await asyncio.to_thread(functools.partial(_set_nx, idempotency_key))
-        if already_processed is None:
+        def _key_exists(key: str) -> bool:
+            return _redis_client.exists(key) == 1
+
+        key_exists = await asyncio.to_thread(_functools.partial(_key_exists, idempotency_key))
+        if key_exists:
             # Key already existed — this payment_intent_id was already processed
             result = await db.execute(
                 select(AttorneyRegistered).where(AttorneyRegistered.id == attorney.id)
@@ -575,15 +575,26 @@ async def confirm_credit_purchase(
             return {"credits": current_attorney.credits, "credits_added": 0}
     except Exception:
         log.warning("credit_purchase_idempotency_redis_unavailable", payment_intent_id=payment_intent_id)
-        # Redis unavailable — proceed without idempotency guard
+        _redis_client = None  # Proceed without idempotency guard if Redis is unavailable
 
-    # Atomic SQL increment to avoid race condition on stale in-memory credits
+    # Step B: Atomic SQL increment to avoid race condition on stale in-memory credits
     await db.execute(
         update(AttorneyRegistered)
         .where(AttorneyRegistered.id == attorney.id)
         .values(credits=AttorneyRegistered.credits + pack["credits"])
     )
     await db.commit()
+
+    # Step C: SET the idempotency key AFTER successful commit (so failed commits don't block retries)
+    if _redis_client is not None:
+        try:
+            import functools as _functools
+
+            await asyncio.to_thread(
+                _functools.partial(_redis_client.set, idempotency_key, "1", ex=86400)
+            )
+        except Exception:
+            log.warning("credit_purchase_idempotency_set_failed", payment_intent_id=payment_intent_id)
 
     # Re-fetch to get the authoritative new balance
     result = await db.execute(
