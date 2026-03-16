@@ -106,6 +106,18 @@ async def lifespan(app: FastAPI):
     await init_db()
     log.info("database_initialized")
 
+    # Column migration: add credits to attorneys_registered if it doesn't exist yet
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0"
+            ))
+        log.info("db_migration_credits_column_ok")
+    except Exception as _exc:
+        log.warning("db_migration_credits_column_skipped", reason=str(_exc))
+
     log.info("startup_complete", app="Fact-Pattern Attorney Matchmaker")
     yield
     # --- Shutdown ----------------------------------------------------------
