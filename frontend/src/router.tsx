@@ -9,6 +9,7 @@ import CookiePolicy from "./pages/CookiePolicy";
 import CaseLookupPage from "./pages/CaseLookupPage";
 import CoveragePage from "./pages/CoveragePage";
 import DashboardPage from "./pages/DashboardPage";
+import BusinessIntakePage from "./pages/BusinessIntakePage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -21,4 +22,5 @@ export const router = createBrowserRouter([
   { path: "/case-lookup", element: <CaseLookupPage /> },
   { path: "/coverage", element: <CoveragePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
+  { path: "/business/intake", element: <BusinessIntakePage /> },
 ]);

@@ -26,6 +26,9 @@ export default function LandingNav() {
           <Link to="/dashboard" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
             My Cases
           </Link>
+          <Link to="/business/intake" className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">
+            For Business
+          </Link>
         </div>
         <Link
           to="/app"
