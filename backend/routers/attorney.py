@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -45,6 +46,8 @@ from models.schemas import (
     ApiKeyResponse,
     McpKeyResponse,
     TrendPoint,
+    WebhookConfig,
+    WebhookTestResult,
 )
 from services.billing import (
     create_credit_purchase_intent,
@@ -89,6 +92,27 @@ async def _update_attorney_embedding(attorney_id: str) -> None:
                 log.info("attorney.embedding_updated", attorney_id=attorney_id)
     except Exception as exc:
         log.warning("attorney.embedding_failed", attorney_id=attorney_id, error=str(exc))
+
+
+async def _fire_webhook(attorney: AttorneyRegistered, event: str, payload: dict) -> None:
+    """Fire-and-forget webhook delivery with HMAC-SHA256 signature."""
+    import httpx
+    import json as _json
+    config = attorney.webhook_config or {}
+    if not config.get("enabled") or not config.get("url"):
+        return
+    body_bytes = _json.dumps({"event": event, **payload}).encode()
+    sig = hmac.new(config["secret"].encode(), body_bytes, hashlib.sha256).hexdigest()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                config["url"],
+                content=body_bytes,
+                headers={"Content-Type": "application/json", "X-Webhook-Signature": sig},
+            )
+        log.info("webhook_fired", attorney_id=attorney.id, event=event)
+    except Exception as e:
+        log.warning("webhook_failed", attorney_id=attorney.id, error=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +425,14 @@ async def respond_to_lead(
                 ))
         except Exception as exc:
             log.warning("lead_accepted_email_failed", error=str(exc))
+
+        # Fire webhook if configured
+        loop = asyncio.get_running_loop()
+        loop.create_task(_fire_webhook(attorney, "lead.accepted", {
+            "lead_id": str(lead_id),
+            "attorney_id": str(attorney.id),
+            "case_summary": lead.case_summary,
+        }))
 
     return LeadSummary(
         id=lead.id,
@@ -955,3 +987,75 @@ async def revoke_api_key(
     )
     await db.commit()
     log.info("api_key_revoked", key_id=key_id, attorney_id=attorney.id)
+
+
+# ---------------------------------------------------------------------------
+# Webhook configuration
+# ---------------------------------------------------------------------------
+
+@router.get("/webhook", response_model=WebhookConfig)
+async def get_webhook_config(
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+):
+    """Get current webhook configuration."""
+    config = attorney.webhook_config or {}
+    return WebhookConfig(
+        url=config.get("url", ""),
+        secret=config.get("secret", ""),
+        enabled=config.get("enabled", False),
+    )
+
+
+@router.put("/webhook", response_model=WebhookConfig)
+async def set_webhook_config(
+    body: WebhookConfig,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set webhook URL and enable/disable. Auto-generates secret if not provided."""
+    secret = body.secret or secrets.token_hex(16)
+    config = {"url": body.url, "secret": secret, "enabled": body.enabled}
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney.id)
+        .values(webhook_config=config)
+    )
+    await db.commit()
+    log.info("webhook_config_updated", attorney_id=attorney.id)
+    return WebhookConfig(url=body.url, secret=secret, enabled=body.enabled)
+
+
+@router.post("/webhook/test", response_model=WebhookTestResult)
+async def test_webhook(
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+):
+    """Send a test payload to the configured webhook URL."""
+    import httpx
+    import json as _json
+    config = attorney.webhook_config or {}
+    url = config.get("url", "")
+    secret = config.get("secret", "")
+    if not url:
+        return WebhookTestResult(success=False, error="No webhook URL configured")
+
+    payload = {
+        "event": "test",
+        "attorney_id": attorney.id,
+        "message": "This is a test webhook from Attorney Matchmaker",
+    }
+    body_bytes = _json.dumps(payload).encode()
+    sig = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                url,
+                content=body_bytes,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Webhook-Signature": sig,
+                },
+            )
+        return WebhookTestResult(success=resp.status_code < 400, status_code=resp.status_code)
+    except Exception as e:
+        return WebhookTestResult(success=False, error=str(e))
