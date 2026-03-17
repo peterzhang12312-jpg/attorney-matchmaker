@@ -4,6 +4,7 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { getAttorneyProfile, getAttorneyLeads, respondToLead } from "../api/client";
 import type { AttorneyProfile, CreditPackage, LeadSummary } from "../types/api";
 import { Award, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import AttorneyAnalytics from "./analytics/AttorneyAnalytics";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -302,6 +303,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
   >({});
   const [buyingCredits, setBuyingCredits] = useState(false);
   const [credits, setCredits] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<"leads" | "analytics">("leads");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -497,7 +499,25 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
         </div>
       )}
 
+      {/* Tab bar */}
+      <div className="border-b border-[rgba(25,25,24,0.12)] flex gap-6 px-6 mt-4">
+        {(["leads", "analytics"] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`font-mono text-[0.65rem] uppercase tracking-widest pb-3 border-b-2 transition-colors ${
+              activeTab === tab
+                ? "border-[#FCAA2D] text-[#191918]"
+                : "border-transparent text-[rgba(25,25,24,0.45)] hover:text-[#191918]"
+            }`}
+          >
+            {tab === "leads" ? "Leads" : "Analytics"}
+          </button>
+        ))}
+      </div>
+
       {/* Leads section */}
+      {activeTab === "leads" && (
       <div>
         <h2 className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] mb-3">
           Case Leads
@@ -633,6 +653,13 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
           </div>
         )}
       </div>
+      )}
+
+      {activeTab === "analytics" && (
+        <div className="p-6">
+          <AttorneyAnalytics token={token} />
+        </div>
+      )}
 
       {/* Stripe reveal modal */}
       {revealLead && (
