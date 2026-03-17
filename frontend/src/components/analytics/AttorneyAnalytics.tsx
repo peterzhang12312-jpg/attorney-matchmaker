@@ -3,14 +3,36 @@ import FunnelChart from "./FunnelChart";
 import BenchmarkCard from "./BenchmarkCard";
 import TrendsChart from "./TrendsChart";
 
+interface FunnelData {
+  received: number;
+  viewed: number;
+  accepted: number;
+  retained: number;
+}
+
+interface BenchmarkData {
+  response_time_percentile: number;
+  acceptance_rate_percentile: number;
+  avg_response_hours: number;
+  peer_avg_response_hours: number;
+  acceptance_rate: number;
+  peer_acceptance_rate: number;
+}
+
+interface TrendPoint {
+  week: string;
+  practice_area: string;
+  count: number;
+}
+
 interface Props {
   token: string;
 }
 
 export default function AttorneyAnalytics({ token }: Props) {
-  const [funnel, setFunnel] = useState<any>(null);
-  const [benchmark, setBenchmark] = useState<any>(null);
-  const [trends, setTrends] = useState<any>(null);
+  const [funnel, setFunnel] = useState<FunnelData | null>(null);
+  const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
+  const [trends, setTrends] = useState<TrendPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
