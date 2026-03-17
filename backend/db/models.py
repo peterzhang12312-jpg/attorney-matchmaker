@@ -75,6 +75,7 @@ class AttorneyRegistered(Base):
     is_founding = Column(String, nullable=True, default="false")  # first 20 attorneys
     credits = Column(Integer, nullable=False, default=0, server_default="0")
     profile_embedding = Column(JSON, nullable=True)   # list[float] 768-dim Gemini embedding
+    mcp_api_key_hash = Column(String, nullable=True)  # SHA-256 hash of MCP API key
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
