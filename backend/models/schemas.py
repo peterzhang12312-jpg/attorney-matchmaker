@@ -744,3 +744,8 @@ class LitigationTimeline(BaseModel):
     total_estimated_duration: str
     phases: list[LitigationTimelinePhase]
     important_notes: list[str]
+
+
+class McpKeyResponse(BaseModel):
+    api_key: str
+    message: str

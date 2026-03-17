@@ -7,6 +7,8 @@ All routes are prefixed with /attorney (the /api prefix is added in main.py).
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import secrets
 from datetime import datetime, timezone
 
 import jwt
@@ -32,6 +34,7 @@ from models.schemas import (
     LeadRespondRequest,
     LeadRevealResponse,
     LeadSummary,
+    McpKeyResponse,
 )
 from services.billing import (
     create_credit_purchase_intent,
@@ -712,4 +715,40 @@ async def reveal_lead_with_credit(
         practice_area=summary.get("practice_area"),
         urgency=summary.get("urgency"),
         jurisdiction=summary.get("jurisdiction"),
+    )
+
+
+@router.post("/mcp-keys", summary="Generate MCP API key for Claude integration")
+async def generate_mcp_key(
+    authorization: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new MCP API key for use with the Claude MCP server.
+    Requires attorney JWT. Returns the key once -- store it securely.
+    """
+    payload = decode_token(authorization.removeprefix("Bearer ").strip())
+    attorney_id = payload.get("sub")
+    if not attorney_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    result = await db.execute(select(AttorneyRegistered).where(AttorneyRegistered.id == attorney_id))
+    attorney = result.scalar_one_or_none()
+    if not attorney:
+        raise HTTPException(status_code=404, detail="Attorney not found")
+
+    # Generate key and store hash
+    raw_key = secrets.token_hex(32)  # 64-char hex
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney_id)
+        .values(mcp_api_key_hash=key_hash)
+    )
+    await db.commit()
+
+    log.info("mcp_key_generated", attorney_id=attorney_id)
+    return McpKeyResponse(
+        api_key=raw_key,
+        message="Store this key securely. It will not be shown again.",
     )
