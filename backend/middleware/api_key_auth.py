@@ -64,7 +64,7 @@ async def get_api_key_client(
     await db.execute(
         update(ApiUsage)
         .where(ApiUsage.api_key_id == api_key.id, ApiUsage.date == today)
-        .values(request_count=usage.request_count + 1)
+        .values(request_count=ApiUsage.request_count + 1)
     )
     await db.commit()
 
