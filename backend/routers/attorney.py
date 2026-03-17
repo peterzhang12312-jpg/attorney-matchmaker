@@ -9,7 +9,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import date, datetime, timedelta, timezone
 
 import jwt
 import structlog
@@ -18,7 +19,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.attorney_auth import create_token, decode_token, hash_password, verify_password
-from db.models import AttorneyRegistered, Case, Lead
+from db.models import ApiKey, ApiUsage, AttorneyRegistered, Case, Lead
 from db.session import get_db
 from middleware.rate_limit import limiter
 from models.schemas import (
@@ -39,6 +40,9 @@ from models.schemas import (
     LeadRespondRequest,
     LeadRevealResponse,
     LeadSummary,
+    ApiKeyCreate,
+    ApiKeyCreatedResponse,
+    ApiKeyResponse,
     McpKeyResponse,
     TrendPoint,
 )
@@ -860,3 +864,94 @@ async def get_analytics_trends(
         for (week, pa), count in sorted(buckets.items())
     ]
     return AnalyticsTrendsResponse(points=points)
+
+
+# ---------------------------------------------------------------------------
+# API key management
+# ---------------------------------------------------------------------------
+
+@router.get("/api-keys", response_model=list[ApiKeyResponse])
+async def list_api_keys(
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all API keys for the authenticated attorney."""
+    result = await db.execute(
+        select(ApiKey).where(ApiKey.owner_attorney_id == attorney.id)
+    )
+    keys = result.scalars().all()
+
+    today = date.today().isoformat()
+    response = []
+    for key in keys:
+        usage_result = await db.execute(
+            select(ApiUsage).where(
+                ApiUsage.api_key_id == key.id,
+                ApiUsage.date == today,
+            )
+        )
+        usage = usage_result.scalar_one_or_none()
+        response.append(ApiKeyResponse(
+            id=key.id,
+            label=key.label,
+            tier=key.tier,
+            daily_limit=key.daily_limit,
+            is_active=key.is_active,
+            created_at=key.created_at,
+            usage_today=usage.request_count if usage else 0,
+        ))
+    return response
+
+
+@router.post("/api-keys", response_model=ApiKeyCreatedResponse)
+async def create_api_key(
+    body: ApiKeyCreate,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a new white-label API key. Raw key returned once — store it securely."""
+    raw_key = secrets.token_hex(32)  # 64-char hex
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    daily_limit = {"starter": 100, "growth": 500, "enterprise": 0}.get(body.tier, 100)
+
+    new_key = ApiKey(
+        id=str(uuid.uuid4()),
+        owner_attorney_id=attorney.id,
+        key_hash=key_hash,
+        tier=body.tier,
+        daily_limit=daily_limit,
+        label=body.label,
+        is_active=True,
+    )
+    db.add(new_key)
+    await db.commit()
+    await db.refresh(new_key)
+
+    log.info("api_key_created", attorney_id=attorney.id, tier=body.tier)
+    return ApiKeyCreatedResponse(
+        id=new_key.id,
+        api_key=raw_key,
+        label=new_key.label,
+        tier=new_key.tier,
+        daily_limit=new_key.daily_limit,
+    )
+
+
+@router.delete("/api-keys/{key_id}", status_code=204)
+async def revoke_api_key(
+    key_id: str,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deactivate an API key."""
+    result = await db.execute(
+        select(ApiKey).where(ApiKey.id == key_id, ApiKey.owner_attorney_id == attorney.id)
+    )
+    key = result.scalar_one_or_none()
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    await db.execute(
+        update(ApiKey).where(ApiKey.id == key_id).values(is_active=False)
+    )
+    await db.commit()
+    log.info("api_key_revoked", key_id=key_id, attorney_id=attorney.id)
