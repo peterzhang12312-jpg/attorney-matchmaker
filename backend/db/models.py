@@ -29,6 +29,8 @@ class Case(Base):
     budget_goals = Column(JSON, nullable=True)
     advanced_fields = Column(JSON, nullable=True)
     client_email = Column(String, nullable=True)
+    client_type = Column(String, nullable=True, default="individual")
+    business_fields = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     match_results = relationship(
@@ -76,6 +78,7 @@ class AttorneyRegistered(Base):
     credits = Column(Integer, nullable=False, default=0, server_default="0")
     profile_embedding = Column(JSON, nullable=True)   # list[float] 768-dim Gemini embedding
     mcp_api_key_hash = Column(String, nullable=True)  # SHA-256 hash of MCP API key
+    webhook_config = Column(JSON, nullable=True)  # {url, secret, enabled}
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

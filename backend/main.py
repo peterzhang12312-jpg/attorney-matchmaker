@@ -29,7 +29,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from db.models import AttorneyRegistered, Case, Lead
+from db.models import ApiKey, ApiUsage, AttorneyRegistered, Case, Lead
 from db.session import get_db
 from middleware.logging_config import setup_logging
 from middleware.rate_limit import limiter
@@ -146,6 +146,72 @@ async def lifespan(app: FastAPI):
         log.info("db_migration_mcp_api_key_hash_ok")
     except Exception as _exc:
         log.warning("db_migration_mcp_api_key_hash_skipped", reason=str(_exc))
+
+    # Table migration: create api_keys
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS api_keys (
+                    id VARCHAR PRIMARY KEY,
+                    owner_attorney_id VARCHAR NOT NULL REFERENCES attorneys_registered(id) ON DELETE CASCADE,
+                    key_hash VARCHAR NOT NULL UNIQUE,
+                    tier VARCHAR NOT NULL DEFAULT 'starter',
+                    daily_limit INTEGER NOT NULL DEFAULT 100,
+                    label VARCHAR,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+        log.info("db_migration_api_keys_ok")
+    except Exception as _exc:
+        log.warning("db_migration_api_keys_skipped", reason=str(_exc))
+
+    # Table migration: create api_usage
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS api_usage (
+                    id VARCHAR PRIMARY KEY,
+                    api_key_id VARCHAR NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,
+                    date VARCHAR NOT NULL,
+                    request_count INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(api_key_id, date)
+                )
+            """))
+        log.info("db_migration_api_usage_ok")
+    except Exception as _exc:
+        log.warning("db_migration_api_usage_skipped", reason=str(_exc))
+
+    # Column migration: add webhook_config to attorneys_registered
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS webhook_config JSON"
+            ))
+        log.info("db_migration_webhook_config_ok")
+    except Exception as _exc:
+        log.warning("db_migration_webhook_config_skipped", reason=str(_exc))
+
+    # Column migration: add client_type and business_fields to cases
+    try:
+        from sqlalchemy import text
+        from db.session import engine
+        async with engine.begin() as conn:
+            await conn.execute(text(
+                "ALTER TABLE cases ADD COLUMN IF NOT EXISTS client_type VARCHAR DEFAULT 'individual'"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE cases ADD COLUMN IF NOT EXISTS business_fields JSON"
+            ))
+        log.info("db_migration_cases_b2b_ok")
+    except Exception as _exc:
+        log.warning("db_migration_cases_b2b_skipped", reason=str(_exc))
 
     log.info("startup_complete", app="Fact-Pattern Attorney Matchmaker")
     yield
