@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -80,6 +80,38 @@ class AttorneyRegistered(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     leads = relationship("Lead", back_populates="attorney", cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="owner", cascade="all, delete-orphan")
+
+
+class ApiKey(Base):
+    """White-label API key for external consumers."""
+
+    __tablename__ = "api_keys"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_attorney_id = Column(String, ForeignKey("attorneys_registered.id", ondelete="CASCADE"), nullable=False)
+    key_hash = Column(String, nullable=False, unique=True)  # SHA-256, never store plaintext
+    tier = Column(String, nullable=False, default="starter")  # starter | growth | enterprise
+    daily_limit = Column(Integer, nullable=False, default=100)  # 0 = unlimited
+    label = Column(String, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    owner = relationship("AttorneyRegistered", back_populates="api_keys")
+    usage = relationship("ApiUsage", back_populates="api_key", cascade="all, delete-orphan")
+
+
+class ApiUsage(Base):
+    """Daily usage counter per API key — one row per key per day, upserted."""
+
+    __tablename__ = "api_usage"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    api_key_id = Column(String, ForeignKey("api_keys.id", ondelete="CASCADE"), nullable=False)
+    date = Column(String, nullable=False)  # ISO date string: "2026-03-16"
+    request_count = Column(Integer, nullable=False, default=0)
+
+    api_key = relationship("ApiKey", back_populates="usage")
 
 
 class Lead(Base):
