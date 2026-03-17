@@ -20,7 +20,7 @@ import time
 
 import structlog
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from sqlalchemy import func, select
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -256,6 +256,25 @@ async def get_platform_stats(request: Request, db=Depends(get_db)):
     _stats_cache["data"] = data
     _stats_cache["at"] = now
     return data
+
+
+@app.get("/api/mcp-validate", include_in_schema=False)
+async def mcp_validate_key(request: Request, db=Depends(get_db)):
+    """Validate an MCP API key. Used by mcp_server.py before each tool call."""
+    import hashlib
+    api_key = request.headers.get("X-MCP-API-Key", "")
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Missing X-MCP-API-Key header")
+
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+    result = await db.scalar(
+        select(AttorneyRegistered).where(AttorneyRegistered.mcp_api_key_hash == key_hash)
+    )
+    if not result:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    return {"valid": True}
 
 
 # --- Global exception handler ---------------------------------------------
