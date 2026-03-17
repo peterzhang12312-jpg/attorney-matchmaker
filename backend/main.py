@@ -313,6 +313,192 @@ async def sitemap_xml():
     return Response(content=xml, media_type="application/xml")
 
 
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt():
+    """LLM-readable site description (llms.txt standard)."""
+    from fastapi.responses import PlainTextResponse
+    content = """# Attorney Matchmaker
+
+> AI-powered attorney matching using real federal court docket data. No paid listings.
+
+Attorney Matchmaker helps people find the best-fit attorney for their legal case.
+Users describe their situation; Gemini AI extracts legal issues, practice areas, and
+optimal jurisdiction; a weighted algorithm scores registered attorneys; Claude Opus
+audits the top matches for quality. Results include match scores, reasoning, and
+a venue recommendation.
+
+## What this site does
+
+- Accepts case descriptions and returns ranked attorney matches with AI scoring
+- Covers 16+ practice areas: real estate, IP, immigration, family law, criminal defense, and more
+- Covers 9+ jurisdictions including New York, California, and federal courts nationwide
+- Attorneys self-register and receive leads from matched cases
+- A leaderboard ranks attorneys by domain and jurisdiction using CourtListener docket data
+
+## API
+
+Base URL: https://attorney-matchmaker.onrender.com
+OpenAPI spec: https://attorney-matchmaker.onrender.com/api/openai-spec.json
+ChatGPT plugin manifest: https://attorney-matchmaker.onrender.com/.well-known/ai-plugin.json
+
+### Key endpoints
+
+POST /api/intake        -- Submit a case description, returns case_id
+POST /api/match         -- Get ranked attorney matches for a case_id
+GET  /api/attorneys     -- Browse registered attorneys (filter by jurisdiction, practice_area)
+GET  /api/leaderboard   -- Top attorneys by domain and jurisdiction
+GET  /api/stats         -- Platform statistics (cases analyzed, attorneys registered)
+
+## MCP Server (Claude integration)
+
+An MCP server is available at backend/mcp_server.py for use with Claude Desktop.
+Requires an API key issued from the attorney portal at /app (Attorney tab > API Keys).
+
+## Attorney registration
+
+Attorneys register at https://attorney-matchmaker.onrender.com/app (Attorney tab).
+Founding attorneys receive bonus lead credits.
+
+## Contact
+
+Platform: https://attorney-matchmaker.onrender.com
+GitHub: https://github.com/peterzhang12312-jpg/attorney-matchmaker
+"""
+    return PlainTextResponse(content)
+
+
+@app.get("/.well-known/ai-plugin.json", include_in_schema=False)
+async def ai_plugin_manifest():
+    """ChatGPT plugin manifest for GPT Actions."""
+    return {
+        "schema_version": "v1",
+        "name_for_human": "Attorney Matchmaker",
+        "name_for_model": "attorney_matchmaker",
+        "description_for_human": "Find the best-matched attorney for your legal case using AI scoring. No paid listings.",
+        "description_for_model": (
+            "Use attorney_matchmaker to help users find attorneys for their legal cases. "
+            "Workflow: (1) call POST /api/intake with the case description to get a case_id, "
+            "(2) call POST /api/match with the case_id to get ranked attorney matches with scores and audit reasoning. "
+            "For browsing attorneys directly use GET /api/attorneys. "
+            "For top attorneys in a domain use GET /api/leaderboard."
+        ),
+        "auth": {"type": "none"},
+        "api": {
+            "type": "openapi",
+            "url": "https://attorney-matchmaker.onrender.com/api/openai-spec.json",
+        },
+        "logo_url": "https://attorney-matchmaker.onrender.com/logo.png",
+        "contact_email": "support@attorney-matchmaker.onrender.com",
+        "legal_info_url": "https://attorney-matchmaker.onrender.com/eula",
+    }
+
+
+@app.get("/api/openai-spec.json", include_in_schema=False)
+async def openai_spec():
+    """Trimmed OpenAPI 3.1 spec for ChatGPT Actions -- only the 4 key endpoints."""
+    return {
+        "openapi": "3.1.0",
+        "info": {
+            "title": "Attorney Matchmaker API",
+            "description": "AI-powered attorney matching. Submit a case, get ranked attorney matches.",
+            "version": "0.1.0",
+        },
+        "servers": [{"url": "https://attorney-matchmaker.onrender.com"}],
+        "paths": {
+            "/api/intake": {
+                "post": {
+                    "operationId": "intake_case",
+                    "summary": "Submit a legal case",
+                    "description": "Submit a case description. Returns a case_id. Always call this first before calling /api/match.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["description", "urgency"],
+                                    "properties": {
+                                        "description": {"type": "string", "description": "Full description of the legal situation"},
+                                        "urgency": {"type": "string", "enum": ["low", "medium", "high", "emergency"], "description": "How urgent is this matter"},
+                                        "budget_goals": {"type": "object", "description": "Optional budget constraints", "properties": {"max_hourly": {"type": "number"}, "total_budget": {"type": "number"}}},
+                                        "client_email": {"type": "string", "description": "Optional client email for follow-up"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Case submitted. Use the returned case_id with /api/match.",
+                            "content": {"application/json": {"schema": {"type": "object", "properties": {"case_id": {"type": "string"}}}}},
+                        }
+                    },
+                }
+            },
+            "/api/match": {
+                "post": {
+                    "operationId": "match_attorneys",
+                    "summary": "Get ranked attorney matches for a case",
+                    "description": "Returns AI-ranked attorney matches with scores, practice area analysis, venue recommendation, and Claude Opus audit reasoning. Requires a case_id from /api/intake.",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["case_id"],
+                                    "properties": {"case_id": {"type": "string", "description": "case_id from /api/intake"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Ranked attorney matches with scores and audit.",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            },
+            "/api/attorneys": {
+                "get": {
+                    "operationId": "get_attorneys",
+                    "summary": "Browse registered attorneys",
+                    "description": "Returns a list of registered attorneys. Filter by jurisdiction or practice_area to narrow results.",
+                    "parameters": [
+                        {"name": "jurisdiction", "in": "query", "required": False, "schema": {"type": "string"}, "description": "State or federal jurisdiction (e.g. 'New York', 'California')"},
+                        {"name": "practice_area", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Practice area (e.g. 'real estate', 'immigration')"},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Attorney list with profiles.",
+                            "content": {"application/json": {"schema": {"type": "object", "properties": {"attorneys": {"type": "array"}, "total": {"type": "integer"}}}}},
+                        }
+                    },
+                }
+            },
+            "/api/leaderboard": {
+                "get": {
+                    "operationId": "get_leaderboard",
+                    "summary": "Top-ranked attorneys by domain and jurisdiction",
+                    "description": "Returns attorneys ranked by domain expertise and jurisdiction using CourtListener docket data and AI audit scores.",
+                    "parameters": [
+                        {"name": "domain", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Practice domain (e.g. 'real_estate', 'ip', 'immigration')"},
+                        {"name": "jurisdiction", "in": "query", "required": False, "schema": {"type": "string"}, "description": "Jurisdiction filter"},
+                        {"name": "top_n", "in": "query", "required": False, "schema": {"type": "integer", "default": 5}, "description": "Number of results to return"},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Ranked attorney list.",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            },
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Static file serving -- React SPA (must come AFTER all API routes)
 # ---------------------------------------------------------------------------
