@@ -5,6 +5,7 @@ import { getAttorneyProfile, getAttorneyLeads, respondToLead } from "../api/clie
 import type { AttorneyProfile, CreditPackage, LeadSummary } from "../types/api";
 import { Award, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import AttorneyAnalytics from "./analytics/AttorneyAnalytics";
+import ApiKeysTab from "./attorney/ApiKeysTab";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -303,7 +304,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
   >({});
   const [buyingCredits, setBuyingCredits] = useState(false);
   const [credits, setCredits] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<"leads" | "analytics">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "analytics" | "api-keys">("leads");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -501,7 +502,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
 
       {/* Tab bar */}
       <div className="border-b border-[rgba(25,25,24,0.12)] flex gap-6 px-6 mt-4">
-        {(["leads", "analytics"] as const).map(tab => (
+        {(["leads", "analytics", "api-keys"] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -511,7 +512,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
                 : "border-transparent text-[rgba(25,25,24,0.45)] hover:text-[#191918]"
             }`}
           >
-            {tab === "leads" ? "Leads" : "Analytics"}
+            {tab === "leads" ? "Leads" : tab === "analytics" ? "Analytics" : "API Keys"}
           </button>
         ))}
       </div>
@@ -658,6 +659,12 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
       {activeTab === "analytics" && (
         <div className="p-6">
           <AttorneyAnalytics token={token} />
+        </div>
+      )}
+
+      {activeTab === "api-keys" && (
+        <div className="p-6">
+          <ApiKeysTab token={token} />
         </div>
       )}
 

@@ -367,3 +367,23 @@ export interface LitigationTimeline {
   phases: LitigationTimelinePhase[];
   important_notes: string[];
 }
+
+/* ---------- API Key Management ---------- */
+
+export interface ApiKeyResponse {
+  id: string;
+  label: string | null;
+  tier: string;
+  daily_limit: number;
+  is_active: boolean;
+  created_at: string;
+  usage_today: number;
+}
+
+export interface ApiKeyCreatedResponse {
+  id: string;
+  api_key: string;
+  label: string | null;
+  tier: string;
+  daily_limit: number;
+}
