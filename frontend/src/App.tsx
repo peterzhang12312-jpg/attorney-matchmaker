@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import type { HealthResponse, MatchResponse } from "./types/api";
 import { fetchHealth } from "./api/client";
 import Header from "./components/Header";
@@ -17,9 +18,12 @@ import TimelineCard from "./components/TimelineCard";
 export type Tab = "find" | "roster" | "leaderboard" | "attorney";
 
 export default function App() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("find");
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [matchResult, setMatchResult] = useState<MatchResponse | null>(null);
+  const [matchResult, setMatchResult] = useState<MatchResponse | null>(
+    (location.state as { match_result?: MatchResponse } | null)?.match_result ?? null,
+  );
   const [attorneyToken, setAttorneyToken] = useState<string | null>(
     localStorage.getItem("attorney_token"),
   );

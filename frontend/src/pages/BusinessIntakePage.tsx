@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2, ChevronRight, ChevronLeft, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import LandingNav from "../components/landing/LandingNav";
@@ -152,6 +152,16 @@ export default function BusinessIntakePage() {
   const [loading, setLoading] = useState(false);
   const [jobStage, setJobStage] = useState<string>("queued");
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clear interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
 
   /* ---- Validation ---- */
   const step1Valid =
@@ -177,23 +187,33 @@ export default function BusinessIntakePage() {
         description: description.trim(),
         urgency,
         client_email: clientEmail.trim() || undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ...(({ client_type: "business", business_fields: businessFields } as any)),
+        client_type: "business",
+        business_fields: {
+          company_size: businessFields.company_size || undefined,
+          legal_issue_type: businessFields.legal_issue_type || undefined,
+          in_house_counsel_pref: businessFields.in_house_counsel_pref,
+          monthly_budget: businessFields.monthly_budget || undefined,
+        },
       });
 
       const { job_id } = await enqueueMatch({ case_id: intake.case_id });
 
-      const pollInterval = setInterval(async () => {
+      intervalRef.current = setInterval(async () => {
         try {
           const job = await pollJob(job_id);
           setJobStage(job.stage);
           if (job.stage === "complete" && job.result) {
-            clearInterval(pollInterval);
-            // Store result in sessionStorage so /app can pick it up
-            sessionStorage.setItem("biz_match_result", JSON.stringify(job.result));
-            navigate("/app");
+            if (intervalRef.current !== null) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+            // Navigate to /app, passing the match result via router state
+            navigate("/app", { state: { match_result: job.result } });
           } else if (job.stage === "failed") {
-            clearInterval(pollInterval);
+            if (intervalRef.current !== null) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
             setError(job.error ?? "Match pipeline failed. Please try again.");
             setLoading(false);
           }

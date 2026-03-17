@@ -21,6 +21,13 @@ export interface IntakeRequest {
   primary_remedy?: string;
   evasive_defendant?: boolean;
   advanced_mode?: boolean;
+  client_type?: "individual" | "business";
+  business_fields?: {
+    company_size?: string;
+    legal_issue_type?: string;
+    in_house_counsel_pref?: boolean | null;
+    monthly_budget?: string;
+  } | null;
 }
 
 export interface BudgetGoals {
