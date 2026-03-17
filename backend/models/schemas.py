@@ -749,3 +749,81 @@ class LitigationTimeline(BaseModel):
 class McpKeyResponse(BaseModel):
     api_key: str
     message: str
+
+
+# ---------------------------------------------------------------------------
+# Analytics schemas
+# ---------------------------------------------------------------------------
+
+class FunnelData(BaseModel):
+    received: int
+    viewed: int
+    accepted: int
+    retained: int
+
+
+class BenchmarkData(BaseModel):
+    response_time_percentile: int   # 0-100
+    acceptance_rate_percentile: int
+    avg_response_hours: float
+    peer_avg_response_hours: float
+    acceptance_rate: float
+    peer_acceptance_rate: float
+
+
+class TrendPoint(BaseModel):
+    week: str          # ISO date of week start "2026-03-09"
+    practice_area: str
+    count: int
+
+
+class AnalyticsFunnelResponse(BaseModel):
+    data: FunnelData
+
+
+class AnalyticsBenchmarkResponse(BaseModel):
+    data: BenchmarkData
+
+
+class AnalyticsTrendsResponse(BaseModel):
+    points: list[TrendPoint]
+
+
+# ---------------------------------------------------------------------------
+# API key schemas
+# ---------------------------------------------------------------------------
+
+class ApiKeyCreate(BaseModel):
+    label: str
+    tier: str = "starter"  # starter | growth | enterprise
+
+
+class ApiKeyResponse(BaseModel):
+    id: str
+    label: Optional[str]
+    tier: str
+    daily_limit: int
+    is_active: bool
+    created_at: datetime
+    usage_today: int = 0
+
+
+class ApiKeyCreatedResponse(BaseModel):
+    """Returned once on creation — raw key never stored."""
+    id: str
+    api_key: str   # 64-char hex, show once
+    label: Optional[str]
+    tier: str
+    daily_limit: int
+
+
+class WebhookConfig(BaseModel):
+    url: str
+    secret: str
+    enabled: bool = True
+
+
+class WebhookTestResult(BaseModel):
+    success: bool
+    status_code: Optional[int] = None
+    error: Optional[str] = None
