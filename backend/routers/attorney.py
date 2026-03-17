@@ -432,6 +432,7 @@ async def respond_to_lead(
             "lead_id": str(lead_id),
             "attorney_id": str(attorney.id),
             "case_summary": lead.case_summary,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }))
 
     return LeadSummary(
