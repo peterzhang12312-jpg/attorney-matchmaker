@@ -387,3 +387,17 @@ export interface ApiKeyCreatedResponse {
   tier: string;
   daily_limit: number;
 }
+
+/* ---------- Webhook ---------- */
+
+export interface WebhookConfigRead {
+  url: string;
+  has_secret: boolean;
+  enabled: boolean;
+}
+
+export interface WebhookTestResult {
+  success: boolean;
+  status_code: number | null;
+  error: string | null;
+}
