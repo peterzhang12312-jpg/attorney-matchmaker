@@ -47,6 +47,7 @@ from models.schemas import (
     McpKeyResponse,
     TrendPoint,
     WebhookConfig,
+    WebhookConfigRead,
     WebhookTestResult,
 )
 from services.billing import (
@@ -994,15 +995,15 @@ async def revoke_api_key(
 # Webhook configuration
 # ---------------------------------------------------------------------------
 
-@router.get("/webhook", response_model=WebhookConfig)
+@router.get("/webhook", response_model=WebhookConfigRead)
 async def get_webhook_config(
     attorney: AttorneyRegistered = Depends(get_current_attorney),
 ):
-    """Get current webhook configuration."""
+    """Get current webhook configuration. Secret is masked — never returned after creation."""
     config = attorney.webhook_config or {}
-    return WebhookConfig(
+    return WebhookConfigRead(
         url=config.get("url", ""),
-        secret=config.get("secret", ""),
+        has_secret=bool(config.get("secret")),
         enabled=config.get("enabled", False),
     )
 

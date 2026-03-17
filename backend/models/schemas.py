@@ -823,6 +823,13 @@ class WebhookConfig(BaseModel):
     enabled: bool = True
 
 
+class WebhookConfigRead(BaseModel):
+    """Read-only webhook config — secret is masked to avoid leaking the HMAC key."""
+    url: str
+    has_secret: bool
+    enabled: bool
+
+
 class WebhookTestResult(BaseModel):
     success: bool
     status_code: Optional[int] = None
