@@ -81,7 +81,7 @@ async def create_intake(
         advanced_fields=advanced_fields,
         client_email=body.client_email,
         client_type=body.client_type,
-        business_fields=body.business_fields,
+        business_fields=body.business_fields.model_dump() if body.business_fields else None,
     )
     db.add(case)
     await db.commit()

@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -92,6 +92,14 @@ class RefineFactsResponse(BaseModel):
 # Request schemas
 # ---------------------------------------------------------------------------
 
+class BusinessFields(BaseModel):
+    """Structured B2B metadata attached when client_type == 'business'."""
+    company_size: Optional[str] = None       # "1-10" | "11-50" | "51-200" | "200+"
+    legal_issue_type: Optional[str] = None   # e.g. "contract_dispute", "employment", "ip"
+    in_house_counsel_pref: Optional[bool] = None
+    monthly_budget: Optional[str] = None     # e.g. "under_5k" | "5k_25k" | "25k_plus"
+
+
 class CaseIntakeRequest(BaseModel):
     """Payload submitted by the client through the intake form."""
     description: str = Field(
@@ -146,8 +154,8 @@ class CaseIntakeRequest(BaseModel):
         description="Triggers alternative-service keyword injection in docket search.")
     advanced_mode: bool = Field(False, description="True when submitted via advanced intake grid.")
     client_email: Optional[str] = Field(None, description="Client email for match notifications (optional).")
-    client_type: str = Field("individual", description="'individual' | 'business'")
-    business_fields: Optional[dict] = Field(None, description="B2B metadata: company_size, legal_issue_type, in_house_counsel_pref, monthly_budget.")
+    client_type: Literal["individual", "business"] = Field("individual", description="'individual' | 'business'")
+    business_fields: Optional[BusinessFields] = Field(None, description="B2B metadata — required when client_type is 'business'.")
 
     @field_validator("client_email", mode="before")
     @classmethod
