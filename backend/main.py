@@ -34,7 +34,7 @@ from db.session import get_db
 from middleware.logging_config import setup_logging
 from middleware.rate_limit import limiter
 from models.schemas import ErrorResponse, HealthResponse
-from routers import attorneys, attorney, intake, leaderboard, match, refine, linkedin_auth, case_lookup, stripe_webhook, jobs, coverage, dashboard, cron, timeline
+from routers import attorneys, attorney, intake, leaderboard, match, refine, linkedin_auth, case_lookup, stripe_webhook, jobs, coverage, dashboard, cron, timeline, v1
 
 # ---------------------------------------------------------------------------
 # Environment & logging
@@ -269,6 +269,7 @@ app.include_router(coverage.router)
 app.include_router(dashboard.router)
 app.include_router(cron.router)
 app.include_router(timeline.router)
+app.include_router(v1.router)
 
 # Debug router -- only active when DEBUG=true in .env
 if os.getenv("DEBUG", "").lower() in ("true", "1"):
