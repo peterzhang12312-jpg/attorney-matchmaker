@@ -161,7 +161,7 @@ export default function WebhookSettings({ token }: WebhookSettingsProps) {
           </label>
           <input
             id="webhook-secret"
-            type="text"
+            type="password"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
             placeholder={
