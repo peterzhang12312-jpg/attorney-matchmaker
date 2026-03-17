@@ -268,6 +268,51 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    """Allow all AI crawlers to index the site."""
+    content = """User-agent: *
+Allow: /
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Bytespider
+Allow: /
+Sitemap: https://attorney-matchmaker.onrender.com/sitemap.xml
+"""
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(content)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    """XML sitemap for all public pages."""
+    from fastapi.responses import Response
+    base = "https://attorney-matchmaker.onrender.com"
+    urls = [
+        (base + "/",              "1.0", "weekly"),
+        (base + "/app",           "0.9", "weekly"),
+        (base + "/blog",          "0.8", "weekly"),
+        (base + "/leaderboard",   "0.6", "monthly"),
+        (base + "/case-lookup",   "0.7", "monthly"),
+        (base + "/coverage",      "0.6", "monthly"),
+    ]
+    items = "\n".join(
+        f"  <url><loc>{loc}</loc><priority>{pri}</priority><changefreq>{freq}</changefreq></url>"
+        for loc, pri, freq in urls
+    )
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{items}
+</urlset>"""
+    return Response(content=xml, media_type="application/xml")
+
+
 # ---------------------------------------------------------------------------
 # Static file serving -- React SPA (must come AFTER all API routes)
 # ---------------------------------------------------------------------------
