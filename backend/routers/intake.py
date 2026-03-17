@@ -80,6 +80,8 @@ async def create_intake(
         budget_goals=body.budget_goals.model_dump() if body.budget_goals else None,
         advanced_fields=advanced_fields,
         client_email=body.client_email,
+        client_type=body.client_type,
+        business_fields=body.business_fields,
     )
     db.add(case)
     await db.commit()

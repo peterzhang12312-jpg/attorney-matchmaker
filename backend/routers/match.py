@@ -80,6 +80,7 @@ async def _run_pipeline(job_id: str, case_id: str) -> None:
                 "procedural_posture": adv.get("procedural_posture"),
                 "primary_remedy": adv.get("primary_remedy"),
                 "evasive_defendant": evasive_defendant,
+                "client_type": getattr(case_row, "client_type", "individual") or "individual",
             }
 
             try:

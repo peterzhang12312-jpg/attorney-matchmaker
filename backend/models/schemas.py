@@ -146,6 +146,8 @@ class CaseIntakeRequest(BaseModel):
         description="Triggers alternative-service keyword injection in docket search.")
     advanced_mode: bool = Field(False, description="True when submitted via advanced intake grid.")
     client_email: Optional[str] = Field(None, description="Client email for match notifications (optional).")
+    client_type: str = Field("individual", description="'individual' | 'business'")
+    business_fields: Optional[dict] = Field(None, description="B2B metadata: company_size, legal_issue_type, in_house_counsel_pref, monthly_budget.")
 
     @field_validator("client_email", mode="before")
     @classmethod

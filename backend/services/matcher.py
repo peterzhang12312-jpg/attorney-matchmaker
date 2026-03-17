@@ -457,6 +457,17 @@ async def find_matches(
         base_composite = spec_score + jur_score + exp_score + avail_score + wr_score
         composite = round(min(100.0, base_composite + budget_score + alignment_score), 2)
 
+        # B2B scoring adjustment: boost attorneys suited for business clients
+        if meta.get("client_type") == "business":
+            b2b_bonus = 0.0
+            practice_lower = " ".join(attorney.specializations).lower()
+            if any(kw in practice_lower for kw in ("corporate", "business", "commercial")):
+                b2b_bonus += 10.0
+            if attorney.firm:
+                b2b_bonus += 5.0
+            if b2b_bonus:
+                composite = round(min(100.0, composite + b2b_bonus), 2)
+
         breakdown = ScoreBreakdown(
             specialization_score=round(spec_score, 2),
             jurisdiction_score=round(jur_score, 2),
