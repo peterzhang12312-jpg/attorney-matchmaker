@@ -39,6 +39,31 @@ log = structlog.get_logger()
 TOP_N = 5
 
 
+def _passes_preferences(
+    attorney_row,
+    practice_area: str,
+    budget_total,
+    jurisdiction: str,
+) -> bool:
+    """Return True if the case passes the attorney's intake preferences.
+    If attorney has no preferences (case_preferences is None), always return True."""
+    prefs = getattr(attorney_row, "case_preferences", None)
+    if not prefs:
+        return True
+    if prefs.get("practice_areas") and practice_area:
+        allowed = [p.lower() for p in prefs["practice_areas"]]
+        if practice_area.lower() not in allowed:
+            return False
+    if prefs.get("min_budget") is not None and budget_total is not None:
+        if budget_total < prefs["min_budget"]:
+            return False
+    if prefs.get("jurisdictions") and jurisdiction:
+        allowed_j = [j.lower() for j in prefs["jurisdictions"]]
+        if jurisdiction.lower() not in allowed_j:
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Scoring functions
 # ---------------------------------------------------------------------------
@@ -432,6 +457,17 @@ async def find_matches(
         attorneys = [
             a for a in attorneys if a.availability != Availability.UNAVAILABLE
         ]
+
+    # Filter by attorney case preferences (registered/static attorneys only)
+    if data_source != "courtlistener":
+        _case_pa = analysis.primary_legal_area or ""
+        _case_budget = budget_goals.total_budget if budget_goals and budget_goals.total_budget else None
+        _case_jurisdiction = meta.get("jurisdiction") or ""
+        _filtered = [a for a in attorneys if _passes_preferences(a, _case_pa, _case_budget, _case_jurisdiction)]
+        if len(_filtered) < 3:
+            log.info("preference_filter_fallback", filtered=len(_filtered), total=len(attorneys))
+            _filtered = attorneys
+        attorneys = _filtered
 
     log.info(
         "Scoring %d attorneys (source=%s, primary_area=%s, jurisdiction=%s)",
