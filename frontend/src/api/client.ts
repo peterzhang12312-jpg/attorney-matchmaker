@@ -18,6 +18,7 @@ import type {
   AttorneyProfile,
   LeadSummary,
   CaseLookupResponse,
+  CasePreferences,
 } from "../types/api";
 
 class ApiError extends Error {
@@ -226,18 +227,18 @@ export async function updateAttorneyProfile(
 ): Promise<AttorneyProfile> {
   return request<AttorneyProfile>("/api/attorney/profile", {
     method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
 }
 
 export async function updateAttorneyPreferences(
   token: string,
-  prefs: { practice_areas?: string[]; min_budget?: number; jurisdictions?: string[] }
+  prefs: CasePreferences
 ): Promise<AttorneyProfile> {
   return request<AttorneyProfile>("/api/attorney/preferences", {
     method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(prefs),
   });
 }
