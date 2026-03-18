@@ -33,6 +33,7 @@ from models.schemas import (
     AttorneyProfileUpdate,
     AttorneyRegisterRequest,
     BenchmarkData,
+    CasePreferences,
     CreditPackage,
     CreditPurchaseRequest,
     CreditPurchaseResponse,
@@ -155,6 +156,8 @@ async def get_current_attorney(
 # ---------------------------------------------------------------------------
 
 def _to_profile_response(atty: AttorneyRegistered) -> AttorneyProfileResponse:
+    raw_prefs = atty.case_preferences
+    prefs = CasePreferences(**raw_prefs) if raw_prefs else None
     return AttorneyProfileResponse(
         id=atty.id,
         name=atty.name,
@@ -169,6 +172,7 @@ def _to_profile_response(atty: AttorneyRegistered) -> AttorneyProfileResponse:
         is_founding=atty.is_founding == "true",
         credits=atty.credits or 0,
         created_at=atty.created_at.isoformat() if atty.created_at else None,
+        case_preferences=prefs,
     )
 
 
@@ -323,6 +327,56 @@ async def update_profile(
         asyncio.create_task(_update_attorney_embedding(attorney.id))
 
     log.info("attorney_profile_updated", attorney_id=attorney.id, fields=list(updates.keys()))
+    return _to_profile_response(attorney)
+
+
+# ---------------------------------------------------------------------------
+# PUT /api/attorney/preferences
+# ---------------------------------------------------------------------------
+
+@router.put(
+    "/preferences",
+    response_model=AttorneyProfileResponse,
+    summary="Set case intake preferences",
+)
+async def update_preferences(
+    body: CasePreferences,
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+) -> AttorneyProfileResponse:
+    prefs = body.model_dump(exclude_none=True)
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney.id)
+        .values(case_preferences=prefs if prefs else None)
+    )
+    await db.commit()
+    await db.refresh(attorney)
+    log.info("attorney_preferences_updated", attorney_id=attorney.id, prefs=prefs)
+    return _to_profile_response(attorney)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/attorney/preferences
+# ---------------------------------------------------------------------------
+
+@router.delete(
+    "/preferences",
+    response_model=AttorneyProfileResponse,
+    summary="Clear case preferences (receive all leads)",
+)
+async def clear_preferences(
+    attorney: AttorneyRegistered = Depends(get_current_attorney),
+    db: AsyncSession = Depends(get_db),
+) -> AttorneyProfileResponse:
+    await db.execute(
+        update(AttorneyRegistered)
+        .where(AttorneyRegistered.id == attorney.id)
+        .values(case_preferences=None)
+    )
+    await db.commit()
+    await db.refresh(attorney)
+    log.info("attorney_preferences_cleared", attorney_id=attorney.id)
     return _to_profile_response(attorney)
 
 
