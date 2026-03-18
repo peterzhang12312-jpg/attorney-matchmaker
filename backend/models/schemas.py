@@ -567,8 +567,16 @@ class AttorneyRegisterRequest(BaseModel):
     accepting_clients: Optional[bool] = True
 
 
+class CasePreferences(BaseModel):
+    """Attorney case preference filters. Null fields mean 'accept all'."""
+    practice_areas: Optional[list[str]] = None
+    min_budget: Optional[float] = None
+    jurisdictions: Optional[list[str]] = None
+
+
 class AttorneyProfileUpdate(BaseModel):
     """Partial update for an attorney's own profile."""
+    name: Optional[str] = None
     bar_number: Optional[str] = None
     firm: Optional[str] = None
     jurisdictions: Optional[list[str]] = None
@@ -606,7 +614,8 @@ class AttorneyProfileResponse(BaseModel):
     accepting_clients: bool
     is_founding: bool
     credits: int = 0
-    created_at: Optional[str]
+    created_at: Optional[str] = None
+    case_preferences: Optional[CasePreferences] = None
 
 
 class LeadSummary(BaseModel):
