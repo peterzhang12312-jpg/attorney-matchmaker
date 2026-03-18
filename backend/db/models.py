@@ -79,6 +79,7 @@ class AttorneyRegistered(Base):
     profile_embedding = Column(JSON, nullable=True)   # list[float] 768-dim Gemini embedding
     mcp_api_key_hash = Column(String, nullable=True)  # SHA-256 hash of MCP API key
     webhook_config = Column(JSON, nullable=True)  # {url, secret, enabled}
+    case_preferences = Column(JSON, nullable=True)  # {practice_areas?, min_budget?, jurisdictions?}
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
