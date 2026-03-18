@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { getAttorneyProfile, getAttorneyLeads, respondToLead } from "../api/client";
+import { getAttorneyProfile, getAttorneyLeads, respondToLead, updateAttorneyProfile } from "../api/client";
 import type { AttorneyProfile, CreditPackage, LeadSummary } from "../types/api";
 import { Award, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import AttorneyAnalytics from "./analytics/AttorneyAnalytics";
 import ApiKeysTab from "./attorney/ApiKeysTab";
 import WebhookSettings from "./attorney/WebhookSettings";
+import PreferencesTab from "./attorney/PreferencesTab";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -305,7 +306,15 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
   >({});
   const [buyingCredits, setBuyingCredits] = useState(false);
   const [credits, setCredits] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<"leads" | "analytics" | "api-keys" | "webhook">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "analytics" | "preferences" | "api-keys" | "webhook">("leads");
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<{
+    name?: string; firm?: string; bar_number?: string;
+    hourly_rate?: string; availability?: string;
+    accepting_clients?: boolean;
+  }>({});
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -332,6 +341,20 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleSaveProfile = async () => {
+    setProfileSaving(true);
+    setProfileSaveError(null);
+    try {
+      const updated = await updateAttorneyProfile(token, profileDraft);
+      setProfile(updated);
+      setEditingProfile(false);
+    } catch {
+      setProfileSaveError("Failed to save. Please try again.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   async function handleRespond(leadId: string, action: "accept" | "decline") {
     setRespondingTo(leadId);
@@ -432,70 +455,156 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
 
           {profileOpen && (
             <div className="px-6 pb-5 space-y-4 border-t border-[rgba(25,25,24,0.08)]">
-              {profile.practice_areas && profile.practice_areas.length > 0 && (
-                <div className="pt-4">
-                  <span className="text-xs font-medium text-[rgba(25,25,24,0.45)] block mb-2">
-                    Practice Areas
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {profile.practice_areas.map((area) => (
-                      <span
-                        key={area}
-                        className="px-2.5 py-1 bg-[#FCAA2D]/10 border border-[#FCAA2D]/20 rounded-md text-xs text-[#191918]"
-                      >
-                        {area}
+              {!editingProfile ? (
+                <>
+                  {profile.practice_areas && profile.practice_areas.length > 0 && (
+                    <div className="pt-4">
+                      <span className="text-xs font-medium text-[rgba(25,25,24,0.45)] block mb-2">
+                        Practice Areas
                       </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {profile.jurisdictions && profile.jurisdictions.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-[rgba(25,25,24,0.45)] block mb-2">
-                    Jurisdictions
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {profile.jurisdictions.map((j) => (
-                      <span
-                        key={j}
-                        className="px-2.5 py-1 bg-[rgba(25,25,24,0.04)] border border-[rgba(25,25,24,0.12)] rounded-md text-xs text-[#191918]"
-                      >
-                        {j}
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.practice_areas.map((area) => (
+                          <span
+                            key={area}
+                            className="px-2.5 py-1 bg-[#FCAA2D]/10 border border-[#FCAA2D]/20 rounded-md text-xs text-[#191918]"
+                          >
+                            {area}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {profile.jurisdictions && profile.jurisdictions.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-[rgba(25,25,24,0.45)] block mb-2">
+                        Jurisdictions
                       </span>
-                    ))}
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.jurisdictions.map((j) => (
+                          <span
+                            key={j}
+                            className="px-2.5 py-1 bg-[rgba(25,25,24,0.04)] border border-[rgba(25,25,24,0.12)] rounded-md text-xs text-[#191918]"
+                          >
+                            {j}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {profile.hourly_rate && (
+                      <div>
+                        <span className="text-[rgba(25,25,24,0.45)] text-xs">Rate</span>
+                        <p className="text-[#191918] font-medium">${profile.hourly_rate}/hr</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-[rgba(25,25,24,0.45)] text-xs">Availability</span>
+                      <p>
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                            profile.availability === "available"
+                              ? "bg-green-100 text-green-700"
+                              : profile.availability === "limited"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {profile.availability}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[rgba(25,25,24,0.45)] text-xs">Accepting Clients</span>
+                      <p className="text-[#191918] font-medium">
+                        {profile.accepting_clients ? "Yes" : "No"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-4 text-sm">
-                {profile.hourly_rate && (
-                  <div>
-                    <span className="text-[rgba(25,25,24,0.45)] text-xs">Rate</span>
-                    <p className="text-[#191918] font-medium">${profile.hourly_rate}/hr</p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-[rgba(25,25,24,0.45)] text-xs">Availability</span>
-                  <p>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                        profile.availability === "available"
-                          ? "bg-green-100 text-green-700"
-                          : profile.availability === "limited"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileDraft({
+                          name: profile.name,
+                          firm: profile.firm ?? "",
+                          bar_number: profile.bar_number ?? "",
+                          hourly_rate: profile.hourly_rate ?? "",
+                          availability: profile.availability,
+                          accepting_clients: profile.accepting_clients,
+                        });
+                        setEditingProfile(true);
+                      }}
+                      className="font-mono text-[0.65rem] uppercase tracking-widest px-3 py-1.5 border border-[rgba(25,25,24,0.2)] rounded-md text-[#191918] hover:bg-[rgba(25,25,24,0.04)] transition-colors"
                     >
-                      {profile.availability}
-                    </span>
-                  </p>
+                      Edit Profile
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="pt-4 space-y-3">
+                  {profileSaveError && (
+                    <p className="text-red-600 text-xs">{profileSaveError}</p>
+                  )}
+                  {[
+                    { label: "Name", key: "name" as const },
+                    { label: "Firm", key: "firm" as const },
+                    { label: "Bar Number", key: "bar_number" as const },
+                    { label: "Hourly Rate ($)", key: "hourly_rate" as const },
+                  ].map(({ label, key }) => (
+                    <div key={key}>
+                      <label className="text-xs text-[rgba(25,25,24,0.45)] block mb-1">{label}</label>
+                      <input
+                        type="text"
+                        value={(profileDraft[key] as string) ?? ""}
+                        onChange={e => setProfileDraft(d => ({ ...d, [key]: e.target.value }))}
+                        className="w-full border border-[rgba(25,25,24,0.2)] rounded-md px-3 py-2 text-sm text-[#191918] bg-white focus:outline-none focus:border-[#FCAA2D]"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-xs text-[rgba(25,25,24,0.45)] block mb-1">Availability</label>
+                    <select
+                      value={profileDraft.availability ?? "available"}
+                      onChange={e => setProfileDraft(d => ({ ...d, availability: e.target.value }))}
+                      className="w-full border border-[rgba(25,25,24,0.2)] rounded-md px-3 py-2 text-sm text-[#191918] bg-white focus:outline-none focus:border-[#FCAA2D]"
+                    >
+                      <option value="available">Available</option>
+                      <option value="limited">Limited</option>
+                      <option value="unavailable">Unavailable</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edit_accepting_clients"
+                      checked={profileDraft.accepting_clients ?? true}
+                      onChange={e => setProfileDraft(d => ({ ...d, accepting_clients: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <label htmlFor="edit_accepting_clients" className="text-sm text-[#191918]">
+                      Accepting new clients
+                    </label>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveProfile}
+                      disabled={profileSaving}
+                      className="font-mono text-[0.65rem] uppercase tracking-widest px-4 py-2 rounded-md bg-[#FCAA2D] text-[#191918] min-h-[36px] disabled:opacity-50 hover:opacity-90 transition-opacity"
+                    >
+                      {profileSaving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingProfile(false); setProfileSaveError(null); }}
+                      className="font-mono text-[0.65rem] uppercase tracking-widest px-4 py-2 rounded-md border border-[rgba(25,25,24,0.2)] text-[#191918] min-h-[36px] hover:bg-[rgba(25,25,24,0.04)] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[rgba(25,25,24,0.45)] text-xs">Accepting Clients</span>
-                  <p className="text-[#191918] font-medium">
-                    {profile.accepting_clients ? "Yes" : "No"}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -503,7 +612,7 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
 
       {/* Tab bar */}
       <div className="border-b border-[rgba(25,25,24,0.12)] flex gap-6 px-6 mt-4">
-        {(["leads", "analytics", "api-keys", "webhook"] as const).map(tab => (
+        {(["leads", "analytics", "preferences", "api-keys", "webhook"] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
