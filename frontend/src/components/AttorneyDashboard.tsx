@@ -626,9 +626,11 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
               ? "Leads"
               : tab === "analytics"
                 ? "Analytics"
-                : tab === "api-keys"
-                  ? "API Keys"
-                  : "Webhook"}
+                : tab === "preferences"
+                  ? "Preferences"
+                  : tab === "api-keys"
+                    ? "API Keys"
+                    : "Webhook"}
           </button>
         ))}
       </div>
@@ -776,6 +778,14 @@ function AttorneyDashboardInner({ token, onSignOut }: AttorneyDashboardProps) {
         <div className="p-6">
           <AttorneyAnalytics token={token} />
         </div>
+      )}
+
+      {activeTab === "preferences" && profile && (
+        <PreferencesTab
+          profile={profile}
+          token={token}
+          onUpdate={setProfile}
+        />
       )}
 
       {activeTab === "api-keys" && (
