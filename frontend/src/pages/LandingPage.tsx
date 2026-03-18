@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import LandingNav from "../components/landing/LandingNav";
 import HeroBlock from "../components/landing/HeroBlock";
 import StatsBand from "../components/landing/StatsBand";
@@ -98,6 +99,18 @@ const faqSchema = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#FFFEF2]">
+      <Helmet>
+        <title>Attorney Matchmaker — Find the Right Attorney Using Real Court Data</title>
+        <meta name="description" content="AI-powered attorney matching that uses real federal docket records, not paid listings. Describe your case and get matched to attorneys with proven experience in your exact situation." />
+        <link rel="canonical" href="https://attorney-matchmaker.onrender.com" />
+        <meta property="og:title" content="Attorney Matchmaker — Find the Right Attorney Using Real Court Data" />
+        <meta property="og:description" content="AI-powered attorney matching using real federal court data. No paid listings. Free for clients." />
+        <meta property="og:url" content="https://attorney-matchmaker.onrender.com" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Attorney Matchmaker" />
+        <meta name="twitter:description" content="Find attorneys matched to your case using real court docket data, not paid rankings." />
+      </Helmet>
       <JsonLd data={legalServiceSchema} />
       <JsonLd data={faqSchema} />
       <LandingNav />
