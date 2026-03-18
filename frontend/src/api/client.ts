@@ -211,6 +211,44 @@ export async function respondToLead(
   });
 }
 
+export async function updateAttorneyProfile(
+  token: string,
+  updates: Partial<{
+    name: string;
+    bar_number: string;
+    firm: string;
+    hourly_rate: string;
+    availability: string;
+    accepting_clients: boolean;
+    jurisdictions: string[];
+    practice_areas: string[];
+  }>
+): Promise<AttorneyProfile> {
+  return request<AttorneyProfile>("/api/attorney/profile", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function updateAttorneyPreferences(
+  token: string,
+  prefs: { practice_areas?: string[]; min_budget?: number; jurisdictions?: string[] }
+): Promise<AttorneyProfile> {
+  return request<AttorneyProfile>("/api/attorney/preferences", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(prefs),
+  });
+}
+
+export async function clearAttorneyPreferences(token: string): Promise<AttorneyProfile> {
+  return request<AttorneyProfile>("/api/attorney/preferences", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function lookupCase(
   query: string,
   intakeCaseId?: string,

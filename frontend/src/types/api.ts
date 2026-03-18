@@ -276,6 +276,13 @@ export interface AttorneyProfile {
   is_founding: boolean;
   credits?: number;
   created_at?: string;
+  case_preferences?: CasePreferences;
+}
+
+export interface CasePreferences {
+  practice_areas?: string[];
+  min_budget?: number;
+  jurisdictions?: string[];
 }
 
 export interface LeadSummary {
