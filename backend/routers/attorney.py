@@ -473,13 +473,18 @@ async def respond_to_lead(
             case_row = case_result.scalar_one_or_none()
             client_email = getattr(case_row, "client_email", None) if case_row else None
             if client_email:
-                asyncio.create_task(send_lead_accepted_to_client(
-                    client_email=client_email,
-                    attorney_name=attorney.name,
-                    firm=attorney.firm or "",
-                ))
+                async def _send_accepted(email=client_email):
+                    try:
+                        await send_lead_accepted_to_client(
+                            client_email=email,
+                            attorney_name=attorney.name,
+                            firm=attorney.firm or "",
+                        )
+                    except Exception as _exc:
+                        log.warning("lead_accepted_email_failed", error=str(_exc))
+                asyncio.create_task(_send_accepted())
         except Exception as exc:
-            log.warning("lead_accepted_email_failed", error=str(exc))
+            log.warning("lead_accepted_email_lookup_failed", error=str(exc))
 
         # Fire webhook if configured
         loop = asyncio.get_running_loop()

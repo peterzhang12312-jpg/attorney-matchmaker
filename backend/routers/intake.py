@@ -97,12 +97,17 @@ async def create_intake(
     # Fire-and-forget confirmation email (non-blocking)
     if body.client_email:
         from services.email import send_case_confirmation
-        asyncio.create_task(send_case_confirmation(
-            to_email=body.client_email,
-            case_id=case_id,
-            practice_area=body.legal_area or "",
-            urgency=body.urgency.value,
-        ))
+        async def _send_confirmation():
+            try:
+                await send_case_confirmation(
+                    to_email=body.client_email,
+                    case_id=case_id,
+                    practice_area=body.legal_area or "",
+                    urgency=body.urgency.value,
+                )
+            except Exception as _exc:
+                log.warning("case_confirmation_email_failed", error=str(_exc))
+        asyncio.create_task(_send_confirmation())
 
     return CaseIntakeResponse(
         case_id=case_id,
