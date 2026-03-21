@@ -45,6 +45,12 @@ async function request<T>(
       signal: controller.signal,
     });
 
+    if (res.status === 401) {
+      localStorage.removeItem("attorney_token");
+      window.location.href = "/app";
+      throw new Error("Session expired. Please log in again.");
+    }
+
     if (!res.ok) {
       const body = await res.text().catch(() => "Unknown error");
       throw new ApiError(res.status, body);
