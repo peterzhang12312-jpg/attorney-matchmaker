@@ -58,6 +58,7 @@ _REQUIRED_KEYS = {
     "GEMINI_API_KEY":          "Gemini fact-pattern analysis",
     "ANTHROPIC_API_KEY":       "Claude Opus audit layer",
     "COURTLISTENER_API_TOKEN": "CourtListener RECAP docket search",
+    "JWT_SECRET_KEY":          "Attorney portal JWT signing — set to a random 64-char hex string",
 }
 
 
