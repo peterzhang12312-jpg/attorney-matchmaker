@@ -11,6 +11,7 @@ import CoveragePage from "./pages/CoveragePage";
 import DashboardPage from "./pages/DashboardPage";
 import BusinessIntakePage from "./pages/BusinessIntakePage";
 import FindAttorneyPage from "./pages/FindAttorneyPage";
+import GetHelpPage from "./pages/GetHelpPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -25,4 +26,5 @@ export const router = createBrowserRouter([
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/business/intake", element: <BusinessIntakePage /> },
   { path: "/find-attorney/:practiceArea/:city", element: <FindAttorneyPage /> },
+  { path: "/get-help", element: <GetHelpPage /> },
 ]);
