@@ -413,6 +413,21 @@ async def sitemap_xml():
         (base + "/case-lookup",   "0.7", "monthly"),
         (base + "/coverage",      "0.6", "monthly"),
     ]
+    # SEO landing pages
+    PRACTICE_AREAS = [
+        "personal-injury", "criminal-defense", "immigration",
+    ]
+    CITIES = [
+        "new-york", "los-angeles", "chicago", "houston", "phoenix",
+        "philadelphia", "san-antonio", "san-diego", "dallas", "san-jose",
+    ]
+    for area in PRACTICE_AREAS:
+        for city_slug in CITIES:
+            urls.append((
+                f"{base}/find-attorney/{area}/{city_slug}",
+                "0.8",
+                "monthly",
+            ))
     items = "\n".join(
         f"  <url><loc>{loc}</loc><priority>{pri}</priority><changefreq>{freq}</changefreq></url>"
         for loc, pri, freq in urls

@@ -10,6 +10,7 @@ import CaseLookupPage from "./pages/CaseLookupPage";
 import CoveragePage from "./pages/CoveragePage";
 import DashboardPage from "./pages/DashboardPage";
 import BusinessIntakePage from "./pages/BusinessIntakePage";
+import FindAttorneyPage from "./pages/FindAttorneyPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -23,4 +24,5 @@ export const router = createBrowserRouter([
   { path: "/coverage", element: <CoveragePage /> },
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/business/intake", element: <BusinessIntakePage /> },
+  { path: "/find-attorney/:practiceArea/:city", element: <FindAttorneyPage /> },
 ]);
