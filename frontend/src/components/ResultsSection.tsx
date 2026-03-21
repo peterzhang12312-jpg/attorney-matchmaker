@@ -28,7 +28,7 @@ export default function ResultsSection({ matches, audit }: ResultsSectionProps) 
       <div className="flex items-center gap-2">
         <Award className="h-5 w-5 text-[#FCAA2D]" />
         <h2 className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)]">
-          Top Attorney Matches
+          Matched Attorneys
         </h2>
         <span className="text-xs text-gray-400">
           ({matches.length} result{matches.length !== 1 ? "s" : ""})

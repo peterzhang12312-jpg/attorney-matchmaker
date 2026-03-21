@@ -554,7 +554,7 @@ export default function PrivacyPolicy() {
 
           <p className="text-[rgba(25,25,24,0.45)] text-xs mt-6 leading-relaxed">
             This privacy policy was prepared for Attorney Matchmaker and reflects our actual data practices
-            as of the effective date above. This document does not constitute legal advice and we recommend
+            as of the effective date above. This document does not constitute legal advice and we encourage
             consulting a licensed attorney for compliance review specific to your jurisdiction and business
             model.
           </p>

@@ -22,7 +22,7 @@ export default function LeaderboardAuditPanel({ audit }: LeaderboardAuditPanelPr
       <div className="flex items-center gap-2 mb-3 p-3 bg-[rgba(252,170,45,0.08)] rounded-xl border border-[rgba(252,170,45,0.2)]">
         <Crown className="h-4 w-4 text-[#FCAA2D] shrink-0" />
         <div>
-          <div className="font-mono text-[0.65rem] text-[rgba(25,25,24,0.45)] uppercase tracking-wide">Top Recommendation</div>
+          <div className="font-mono text-[0.65rem] text-[rgba(25,25,24,0.45)] uppercase tracking-wide">Top Match</div>
           <div className="text-sm font-semibold text-[#191918]">{audit.top_pick}</div>
         </div>
       </div>

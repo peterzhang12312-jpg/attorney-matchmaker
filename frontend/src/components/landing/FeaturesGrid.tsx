@@ -1,7 +1,7 @@
 const features = [
   { icon: "⚖️", title: "AI Scoring", desc: "Claude Opus audits every match. Gemini 2.5 Flash analyzes your facts." },
   { icon: "📋", title: "Real Docket Data", desc: "Attorneys ranked from CourtListener federal docket records — not self-reported stats." },
-  { icon: "📍", title: "Venue Optimizer", desc: "AI recommends the optimal court venue for your case type and facts." },
+  { icon: "📍", title: "Venue Optimizer", desc: "AI identifies the optimal court venue for your case type and facts." },
   { icon: "💵", title: "Budget Matching", desc: "Filter attorneys by hourly rate ceiling. No surprises." },
   { icon: "🏛️", title: "16 Practice Areas", desc: "From real estate to immigration, criminal defense to IP litigation." },
   { icon: "✅", title: "Live Verification", desc: "CourtListener lookup with NYSCEF manual verification link for every attorney." },

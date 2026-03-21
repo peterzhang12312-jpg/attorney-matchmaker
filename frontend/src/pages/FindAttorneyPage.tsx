@@ -102,7 +102,7 @@ export default function FindAttorneyPage() {
           </li>
           <li className="flex items-center gap-2">
             <span className="text-[#FCAA2D] font-bold">✓</span>
-            No commitment — just a match recommendation
+            No commitment — just a match result
           </li>
         </ul>
 

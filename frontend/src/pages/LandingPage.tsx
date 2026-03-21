@@ -34,7 +34,7 @@ const faqSchema = {
       "name": "How does AI attorney matching work?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "You describe your legal situation. Gemini AI extracts the practice area, legal issues, and ideal jurisdiction. A weighted algorithm scores registered attorneys. Claude Opus audits the top matches. You see ranked results with scores and reasoning."
+        "text": "You describe your legal situation. Gemini AI extracts the practice area, legal issues, and ideal jurisdiction. A weighted algorithm scores registered attorneys. Claude Opus audits the matched results. You see ranked results with scores and reasoning."
       }
     },
     {
@@ -58,7 +58,7 @@ const faqSchema = {
       "name": "How are attorneys scored and ranked?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Attorneys are scored on practice area match, jurisdiction coverage, availability, client budget alignment, and semantic similarity between their profile and your case using AI embeddings. Claude Opus audits the top matches for quality."
+        "text": "Attorneys are scored on practice area match, jurisdiction coverage, availability, client budget alignment, and semantic similarity between their profile and your case using AI embeddings. Claude Opus audits the matched results for quality."
       }
     },
     {

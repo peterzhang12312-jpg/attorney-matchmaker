@@ -60,7 +60,7 @@ export default function CaseHistoryCard({ caseData }: Props) {
           {caseData.top_attorney && (
             <span>
               {" "}
-              &mdash; top match:{" "}
+              &mdash; closest match:{" "}
               <strong className="text-[#191918]">{caseData.top_attorney}</strong>
             </span>
           )}

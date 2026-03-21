@@ -1,7 +1,7 @@
 const steps = [
   { n: "01", title: "Describe Your Case", desc: "Tell us the facts, urgency, and budget. Takes 2 minutes." },
   { n: "02", title: "AI Analyzes Dockets", desc: "Gemini extracts case type and keywords. We query CourtListener for attorneys with real docket history." },
-  { n: "03", title: "Get Matched Attorneys", desc: "Top attorneys ranked by AI score, budget fit, and verified court experience." },
+  { n: "03", title: "Get Matched Attorneys", desc: "Attorneys ranked by AI score, budget fit, and verified court experience." },
 ];
 
 export default function HowItWorks() {

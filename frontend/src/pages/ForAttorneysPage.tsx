@@ -57,7 +57,7 @@ export default function ForAttorneysPage() {
           We have clients looking for you
         </h1>
         <p className="text-[rgba(25,25,24,0.65)] mb-4 leading-relaxed">
-          Attorney Matchmaker uses AI to match people with their ideal attorney
+          Attorney Matchmaker uses AI to connect people with matched attorneys
           based on real court record data — not who paid for a listing.
         </p>
         <p className="text-[rgba(25,25,24,0.65)] mb-10 leading-relaxed">

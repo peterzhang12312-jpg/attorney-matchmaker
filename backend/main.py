@@ -241,7 +241,7 @@ app = FastAPI(
     description=(
         "Ingests case facts, uses Gemini to extract legal issues and jurisdiction, "
         "scores attorneys via a weighted matching algorithm, and validates the "
-        "top matches with Claude Opus."
+        "matched results with Claude Opus."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -414,6 +414,8 @@ async def sitemap_xml():
         (base + "/leaderboard",   "0.6", "monthly"),
         (base + "/case-lookup",   "0.7", "monthly"),
         (base + "/coverage",      "0.6", "monthly"),
+        (base + "/get-help",      "0.9", "weekly"),
+        (base + "/for-attorneys", "0.7", "monthly"),
     ]
     # SEO landing pages
     PRACTICE_AREAS = [
@@ -449,11 +451,11 @@ async def llms_txt():
 
 > AI-powered attorney matching using real federal court docket data. No paid listings.
 
-Attorney Matchmaker helps people find the best-fit attorney for their legal case.
+Attorney Matchmaker helps people find a matched attorney for their legal case.
 Users describe their situation; Gemini AI extracts legal issues, practice areas, and
 optimal jurisdiction; a weighted algorithm scores registered attorneys; Claude Opus
-audits the top matches for quality. Results include match scores, reasoning, and
-a venue recommendation.
+audits the matched results for quality. Results include match scores, reasoning, and
+a venue analysis.
 
 ## What this site does
 

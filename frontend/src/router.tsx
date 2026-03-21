@@ -14,6 +14,7 @@ import FindAttorneyPage from "./pages/FindAttorneyPage";
 import GetHelpPage from "./pages/GetHelpPage";
 import WidgetIntakePage from "./pages/WidgetIntakePage";
 import ForAttorneysPage from "./pages/ForAttorneysPage";
+import ComplaintPage from "./pages/ComplaintPage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -31,4 +32,5 @@ export const router = createBrowserRouter([
   { path: "/get-help", element: <GetHelpPage /> },
   { path: "/widget/intake", element: <WidgetIntakePage /> },
   { path: "/for-attorneys", element: <ForAttorneysPage /> },
+  { path: "/complaint", element: <ComplaintPage /> },
 ]);

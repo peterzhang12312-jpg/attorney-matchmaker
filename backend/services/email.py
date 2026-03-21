@@ -78,7 +78,7 @@ async def send_case_confirmation(
     area_line = f" in <strong>{practice_area}</strong>" if practice_area else ""
     html = _wrap_html(f"""\
 <h2 style="margin:0 0 16px;font-size:20px;color:#191918;">Case Received</h2>
-<p>We received your case{area_line} and are finding your best attorney matches.</p>
+<p>We received your case{area_line} and are finding your attorney matches.</p>
 <p style="margin:16px 0;">
   <strong>Case ID:</strong> <code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;font-size:13px;">{case_id}</code><br>
   <strong>Urgency:</strong> {urgency}

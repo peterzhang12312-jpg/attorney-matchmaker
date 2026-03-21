@@ -20,6 +20,7 @@ export default function LandingFooter() {
           <Link to="/privacy" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Privacy</Link>
           <Link to="/eula" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Terms</Link>
           <Link to="/cookie-policy" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Cookies</Link>
+          <Link to="/complaint" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Complaints</Link>
         </div>
       </div>
     </footer>
