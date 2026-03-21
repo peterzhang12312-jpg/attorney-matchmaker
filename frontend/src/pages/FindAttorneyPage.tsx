@@ -113,6 +113,10 @@ export default function FindAttorneyPage() {
           Get Matched in 2 Minutes →
         </Link>
 
+        <p className="mt-3 text-xs text-[rgba(25,25,24,0.35)]">
+          Not a law firm. No attorney-client relationship is formed by using this service.
+        </p>
+
         <p className="mt-6 text-xs text-[rgba(25,25,24,0.35)] font-mono">
           Expect contact from a matched attorney within 24 hours.
         </p>

@@ -3,6 +3,12 @@ import { Link } from "react-router-dom";
 export default function LandingFooter() {
   return (
     <footer className="bg-[#FFFEF2] border-t border-[rgba(25,25,24,0.12)] px-4 sm:px-6 py-10">
+      <div className="max-w-6xl mx-auto mb-6 border border-[rgba(25,25,24,0.08)] rounded-[10px] bg-white px-5 py-4 space-y-1.5">
+        <p className="text-xs font-mono text-[rgba(25,25,24,0.35)]">Attorney Matchmaker is not a law firm and does not provide legal advice.</p>
+        <p className="text-xs font-mono text-[rgba(25,25,24,0.35)]">We do not recommend or endorse any specific attorney.</p>
+        <p className="text-xs font-mono text-[rgba(25,25,24,0.35)]">Results are based on objective data — court records, practice area, and location match.</p>
+        <p className="text-xs font-mono text-[rgba(25,25,24,0.35)]">The attorney-client relationship is formed directly between you and the attorney you choose.</p>
+      </div>
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <span className="font-mono text-[0.7rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)]">
           © 2026 Attorney Matchmaker

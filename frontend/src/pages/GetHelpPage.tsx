@@ -34,6 +34,10 @@ export default function GetHelpPage() {
           Start Free Match →
         </Link>
 
+        <p className="mt-3 text-xs text-[rgba(25,25,24,0.35)] text-center">
+          Not a law firm. No attorney-client relationship is formed by using this service.
+        </p>
+
         <ul className="mt-10 space-y-3 text-sm text-[rgba(25,25,24,0.55)] text-left">
           <li className="flex items-start gap-3">
             <span className="text-[#FCAA2D] font-bold mt-0.5">✓</span>

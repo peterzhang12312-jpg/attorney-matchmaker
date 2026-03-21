@@ -515,6 +515,10 @@ export default function IntakeForm({ onMatchComplete }: IntakeFormProps) {
               </div>
             </div>
 
+            <p className="text-xs text-[rgba(25,25,24,0.35)] text-center mt-2 mb-4">
+              By submitting, you agree that Attorney Matchmaker is not a law firm and does not provide legal advice.
+            </p>
+
             <div className="flex items-center justify-end">
               <button
                 type="button"
