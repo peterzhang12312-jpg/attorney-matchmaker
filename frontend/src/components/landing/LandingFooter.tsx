@@ -23,6 +23,9 @@ export default function LandingFooter() {
           <Link to="/complaint" className="font-mono text-[0.68rem] uppercase tracking-widest text-[rgba(25,25,24,0.45)] hover:text-[#191918] transition-colors">Complaints</Link>
         </div>
       </div>
+      <p className="text-xs font-mono text-[rgba(25,25,24,0.25)] text-center mt-4">
+        Attorney Matchmaker is operated by a licensed New York attorney.
+      </p>
     </footer>
   );
 }

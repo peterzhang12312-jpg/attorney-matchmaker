@@ -496,6 +496,14 @@ export default function AttorneyOnboard({ onSuccess }: AttorneyOnboardProps) {
               </div>
             )}
 
+            <p className="text-xs text-[rgba(25,25,24,0.35)] text-center">
+              By registering, you agree to our{" "}
+              <a href="/attorney-agreement" target="_blank" className="text-[#FCAA2D] hover:underline">
+                Attorney Participation Agreement
+              </a>
+              {" "}governing referral fee arrangements under NY Rule 1.5(g).
+            </p>
+
             <div className="flex gap-3">
               <button
                 type="button"

@@ -49,8 +49,8 @@ export default function ComplaintPage() {
             </h2>
             <p className="text-sm text-[rgba(25,25,24,0.65)] mb-2">
               Email your complaint to:{" "}
-              <a href="mailto:complaints@attorney-matchmaker.onrender.com" className="text-[#FCAA2D] hover:underline">
-                complaints@attorney-matchmaker.onrender.com
+              <a href="mailto:peter.zhang12312@gmail.com" className="text-[#FCAA2D] hover:underline">
+                peter.zhang12312@gmail.com
               </a>
             </p>
             <p className="text-sm text-[rgba(25,25,24,0.65)]">
