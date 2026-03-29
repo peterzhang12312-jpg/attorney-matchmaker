@@ -31,6 +31,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=650,
         email="schen@chenip.com",
+        bio="I focus exclusively on patent litigation and IP strategy for technology companies, drawing on my doctorate in electrical engineering to understand complex inventions at a technical level. Over 18 years I have guided clients from Silicon Valley startups to multinational corporations through high-stakes patent disputes in the Northern District of California and the Federal Circuit.",
+        languages=["English", "Mandarin"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=8,
     ),
     # ---- 2. Employment / Wage-and-Hour ----
     AttorneyProfile(
@@ -49,6 +54,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=525,
         email="mwilliams@williamslabor.com",
+        bio="I represent workers in wage-and-hour class actions, discrimination claims, and civil rights matters throughout New York and New Jersey. My practice is built on holding employers accountable and ensuring that employees receive the full protection of federal and state labor law.",
+        languages=["English"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=6,
     ),
     # ---- 3. Personal Injury / Med-Mal ----
     AttorneyProfile(
@@ -67,6 +77,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=600,
         email="pokafor@okafortrial.com",
+        bio="With 22 years of trial experience in Illinois courts, I fight for individuals and families devastated by serious injuries and medical negligence. I take cases on contingency and do not collect a fee unless we win.",
+        languages=["English"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=36,
     ),
     # ---- 4. Corporate / M&A ----
     AttorneyProfile(
@@ -85,6 +100,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=850,
         email="jrichardson@richardsonmarks.com",
+        bio="I advise boards, private equity sponsors, and public companies on mergers and acquisitions, corporate governance, and Delaware litigation. My 25-year practice spans billion-dollar cross-border transactions and high-profile Chancery Court disputes.",
+        languages=["English"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=12,
     ),
     # ---- 5. Family Law ----
     AttorneyProfile(
@@ -103,6 +123,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=400,
         email="dreyes@reyesfamily.com",
+        bio="Soy abogada bilingue especializada en derecho familiar en Texas, incluyendo divorcios de alto patrimonio, custodia de menores y modificaciones de ordenes judiciales. I provide compassionate, results-oriented representation for families navigating some of the most difficult moments of their lives.",
+        languages=["English", "Spanish"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=8,
     ),
     # ---- 6. Criminal Defense ----
     AttorneyProfile(
@@ -121,6 +146,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=550,
         email="rkim@kimdefense.com",
+        bio="I am a former prosecutor who now dedicates my practice to defending individuals facing federal and state criminal charges in Florida. My 20 years of experience on both sides of the courtroom give me an inside perspective on how the government builds its cases — and how to dismantle them.",
+        languages=["English", "Korean"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=4,
     ),
     # ---- 7. Real Estate / Land Use ----
     AttorneyProfile(
@@ -139,6 +169,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=500,
         email="atorres@torreslanduse.com",
+        bio="Mi practica se centra en el derecho inmobiliario y de uso del suelo en California, incluyendo litigios bajo CEQA, expropiacion y permisos de desarrollo. I have spent 16 years representing property owners, developers, and community groups before California's courts and administrative agencies.",
+        languages=["English", "Spanish"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=10,
     ),
     # ---- 8. Immigration ----
     AttorneyProfile(
@@ -157,6 +192,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=375,
         email="habdi@abdiimmigration.com",
+        bio="I represent immigrants, asylum seekers, and high-skilled professionals navigating the U.S. immigration system across the DMV region and the Fourth Circuit. My practice covers removal defense, asylum, and employment-based green cards, with a particular focus on clients from East Africa and the Horn of Africa.",
+        languages=["English", "Somali"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=6,
     ),
     # ---- 9. Bankruptcy / Restructuring ----
     AttorneyProfile(
@@ -175,6 +215,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=625,
         email="lkowalski@kowalskirestructuring.com",
+        bio="I advise distressed companies, creditors' committees, and institutional lenders through complex Chapter 11 reorganizations in Illinois and Delaware. My 19 years of restructuring experience span healthcare, retail, and manufacturing sectors.",
+        languages=["English"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=48,
     ),
     # ---- 10. Environmental ----
     AttorneyProfile(
@@ -193,6 +238,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=475,
         email="dnakamura@nakamuraenv.com",
+        bio="I litigate environmental enforcement and cleanup cases in the Pacific Northwest, representing municipalities, tribes, and conservation groups under federal statutes including the Clean Water Act and CERCLA. My 15 years of practice in Washington and Oregon give me deep familiarity with the Ninth Circuit's environmental jurisprudence.",
+        languages=["English", "Japanese"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=12,
     ),
     # ---- 11. Healthcare / Regulatory ----
     AttorneyProfile(
@@ -211,6 +261,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=575,
         email="psharma@sharmahealthlaw.com",
+        bio="My practice combines an MD background with healthcare regulatory law, allowing me to advise hospital systems, physician groups, and life sciences companies on False Claims Act defense, Stark Law compliance, and regulatory investigations. I help clients prevent problems before they become liabilities.",
+        languages=["English", "Hindi"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=10,
     ),
     # ---- 12. Securities / White-Collar ----
     AttorneyProfile(
@@ -229,6 +284,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=900,
         email="tgrant@grantsecurities.com",
+        bio="I defend financial institutions, fund managers, and executives in SEC and DOJ enforcement actions, insider trading prosecutions, and securities fraud investigations. My 21 years at the intersection of Wall Street and the Southern District of New York give my clients an edge when federal regulators come calling.",
+        languages=["English"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=8,
     ),
     # ---- 13. Tax Controversy ----
     AttorneyProfile(
@@ -247,6 +307,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=700,
         email="cblake@blaketax.com",
+        bio="I represent corporations and high-net-worth individuals in IRS audits, Tax Court litigation, and Appeals proceedings, with a focus on transfer pricing and partnership tax disputes. My 17 years of tax controversy work have saved clients over $100M in contested deficiencies.",
+        languages=["English"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=12,
     ),
     # ---- 14. Civil Rights / Section 1983 ----
     AttorneyProfile(
@@ -265,6 +330,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=425,
         email="amitchell@mitchellcr.com",
+        bio="I pursue civil rights and employment discrimination claims in Georgia and Alabama on behalf of individuals who have been harmed by government misconduct, police brutality, or workplace discrimination. I believe access to justice should not depend on the size of your bank account, which is why I handle most civil rights cases on contingency.",
+        languages=["English"],
+        free_consultation=True,
+        photo_url=None,
+        response_time_hours=8,
     ),
     # ---- 15. Employment / Non-Compete ----
     AttorneyProfile(
@@ -283,6 +353,11 @@ ATTORNEYS: list[AttorneyProfile] = [
         ],
         hourly_rate=475,
         email="rhoffman@hoffmanemp.com",
+        bio="I represent both employers and employees in non-compete litigation, trade secret disputes, and wage-and-hour class actions across Massachusetts and New Hampshire. My background in IP law gives me a unique advantage in cases where restrictive covenants intersect with proprietary technology.",
+        languages=["English"],
+        free_consultation=False,
+        photo_url=None,
+        response_time_hours=72,
     ),
 ]
 
