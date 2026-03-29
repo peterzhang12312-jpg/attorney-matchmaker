@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "./App";
 import LandingPage from "./pages/LandingPage";
 import BlogPage from "./pages/BlogPage";
@@ -35,4 +35,6 @@ export const router = createBrowserRouter([
   { path: "/for-attorneys", element: <ForAttorneysPage /> },
   { path: "/complaint", element: <ComplaintPage /> },
   { path: "/attorney-agreement", element: <AttorneyAgreementPage /> },
+  { path: "/rankings", element: <Navigate to="/app" replace /> },
+  { path: "/attorney/login", element: <Navigate to="/app" replace /> },
 ]);

@@ -6,11 +6,11 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from data.attorneys import get_all_attorneys
 from data.federal_courts import FEDERAL_COURTS
-from db.models import AttorneyRegistered, CoverageRequest
+from db.models import CoverageRequest
 from db.session import get_db
 from middleware.rate_limit import limiter
 
@@ -21,17 +21,11 @@ router = APIRouter(prefix="/api/coverage", tags=["Coverage"])
 @router.get("/stats")
 async def coverage_stats(db: AsyncSession = Depends(get_db)) -> dict:
     """Returns attorney count per US state for the density map."""
-    result = await db.execute(
-        select(AttorneyRegistered.jurisdictions, AttorneyRegistered.id)
-        .where(AttorneyRegistered.accepting_clients == "true")
-    )
-    rows = result.all()
+    attorneys = get_all_attorneys()
 
     state_counts: dict[str, int] = {}
-    for jurs_list, _ in rows:
-        if not jurs_list:
-            continue
-        for jur in jurs_list:
+    for attorney in attorneys:
+        for jur in (attorney.jurisdictions or []):
             jur_upper = jur.upper().strip()
             if len(jur_upper) == 2:
                 state_counts[jur_upper] = state_counts.get(jur_upper, 0) + 1
