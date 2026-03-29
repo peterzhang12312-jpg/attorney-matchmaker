@@ -376,7 +376,7 @@ class LinkedInScraper:
                 )
             except PlaywrightTimeout:
                 raise ComposeWindowError(
-                    "Could not find Message or Connect button. "
+                    "Compose modal did not appear after clicking Message button. "
                     "(Clipboard fallback: use pyperclip.copy() before calling this method.)"
                 )
             return
@@ -408,6 +408,10 @@ class LinkedInScraper:
                 "LinkedIn CAPTCHA detected — solve it in the browser window, "
                 "then press Enter to retry..."
             )
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+            except Exception:
+                pass  # best-effort wait; re-check URL regardless
             url = page.url  # re-read after user intervention
             if "/checkpoint/" in url or "/challenge/" in url:
                 raise LinkedInCaptchaError(
