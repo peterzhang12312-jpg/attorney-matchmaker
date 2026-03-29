@@ -125,7 +125,7 @@ export interface Attorney {
   availability: "available" | "limited" | "unavailable";
   notable_cases: string[];
   hourly_rate: number | null;
-  email: string | null;
+  email?: string | null;
   docket_intelligence?: DocketIntelligence | null;
   bio?: string | null;
   languages?: string[];

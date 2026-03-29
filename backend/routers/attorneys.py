@@ -79,10 +79,14 @@ async def list_attorneys(
         availability=availability,
     )
 
-    return AttorneyListResponse(
-        attorneys=attorneys,
-        total=len(attorneys),
-    )
+    # Strip email before returning public list
+    attorneys_public = []
+    for a in attorneys:
+        data = a.model_dump()
+        data.pop("email", None)
+        attorneys_public.append(data)
+
+    return {"attorneys": attorneys_public, "total": len(attorneys_public)}
 
 
 @router.get(
