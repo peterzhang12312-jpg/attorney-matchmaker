@@ -16,6 +16,7 @@ import WidgetIntakePage from "./pages/WidgetIntakePage";
 import ForAttorneysPage from "./pages/ForAttorneysPage";
 import ComplaintPage from "./pages/ComplaintPage";
 import AttorneyAgreementPage from "./pages/AttorneyAgreementPage";
+import AttorneyProfilePage from "./pages/AttorneyProfilePage";
 
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
   { path: "/for-attorneys", element: <ForAttorneysPage /> },
   { path: "/complaint", element: <ComplaintPage /> },
   { path: "/attorney-agreement", element: <AttorneyAgreementPage /> },
+  { path: "/attorney/:id", element: <AttorneyProfilePage /> },
   { path: "/rankings", element: <Navigate to="/app" replace /> },
   { path: "/attorney/login", element: <Navigate to="/app" replace /> },
 ]);
