@@ -19,7 +19,7 @@ message drafts using AI, and opens the LinkedIn compose window — you paste and
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/linkedin-bot.git
+git clone https://github.com/peterzhang12312-jpg/linkedin-bot.git
 cd linkedin-bot
 pip install -r requirements.txt
 playwright install chromium
@@ -31,14 +31,24 @@ playwright install chromium
 
 The bot uses a persistent browser profile so LinkedIn sees your real session.
 
+**Step 1** — Create the profile directory:
 ```bash
-python -m playwright codegen linkedin.com --save-storage=linkedin_session.json
+mkdir li_profile
 ```
 
-A browser window opens. Log in to LinkedIn normally. Once logged in, close the browser.
-This saves your session — you won't need to log in again unless LinkedIn expires it.
+**Step 2** — Launch the browser and log in:
+```bash
+python -m playwright open --save-storage=li_profile/session.json linkedin.com
+```
 
-Set the profile directory in your `.env` file (see next step).
+A browser window opens. Log in to LinkedIn normally. Once logged in, close the browser window. Your session is now saved in `li_profile/`.
+
+**Step 3** — Set the profile path in `.env`:
+```
+LI_PROFILE_DIR=./li_profile
+```
+
+You won't need to log in again unless LinkedIn expires your session.
 
 ---
 
@@ -47,7 +57,11 @@ Set the profile directory in your `.env` file (see next step).
 Copy the example file and fill it in:
 
 ```bash
+# macOS / Linux
 cp .env.example .env
+
+# Windows
+copy .env.example .env
 ```
 
 Open `.env` and set:
@@ -127,7 +141,7 @@ LinkedIn showed a CAPTCHA. Solve it in the browser window that opened, then pres
 **Session expired — re-login required**
 Your LinkedIn session expired. Run:
 ```bash
-python -m playwright codegen linkedin.com --save-storage=linkedin_session.json
+python -m playwright open --save-storage=li_profile/session.json linkedin.com
 ```
 Log in again and close the browser.
 
