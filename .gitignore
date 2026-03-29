@@ -10,6 +10,7 @@
 !/render.yaml
 !/.gitignore
 !/docs/
+!/linkedin-bot/
 
 # ---------------------------------------------------------------
 # Backend
