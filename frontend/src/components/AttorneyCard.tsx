@@ -340,6 +340,17 @@ export default function AttorneyCard({
               >
                 {attorney.availability}
               </span>
+              {attorney.free_consultation && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Free consult
+                </span>
+              )}
+              {attorney.languages && attorney.languages.length > 0 && (
+                <span className="text-[10px] text-gray-400">
+                  {attorney.languages.slice(0, 2).join(" · ")}
+                  {attorney.languages.length > 2 && ` +${attorney.languages.length - 2}`}
+                </span>
+              )}
             </div>
           </div>
 
@@ -484,6 +495,16 @@ export default function AttorneyCard({
 
         {/* Audit section (if present) */}
         {auditData && <AuditBadge auditedMatch={auditData} />}
+
+        <div className="mt-3 pt-3 border-t border-[rgba(25,25,24,0.06)]">
+          <a
+            href={`/attorney/${attorney.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#FCAA2D] hover:text-amber-600 transition-colors"
+          >
+            View full profile
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
       </div>
     </div>
   );
