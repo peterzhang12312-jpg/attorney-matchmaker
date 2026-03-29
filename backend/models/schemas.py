@@ -327,6 +327,11 @@ class AttorneyProfile(BaseModel):
     email: Optional[str] = None
     docket_intelligence: Optional[DocketIntelligence] = None
     caselaw_profile: Optional[CaselawProfile] = None
+    bio: Optional[str] = None
+    languages: list[str] = Field(default_factory=list)
+    free_consultation: bool = False
+    photo_url: Optional[str] = None
+    response_time_hours: Optional[int] = None
 
 
 class ScoreBreakdown(BaseModel):
@@ -584,6 +589,11 @@ class AttorneyProfileUpdate(BaseModel):
     hourly_rate: Optional[str] = None
     availability: Optional[str] = None
     accepting_clients: Optional[bool] = None
+    bio: Optional[str] = None
+    languages: Optional[list[str]] = None
+    free_consultation: Optional[bool] = None
+    photo_url: Optional[str] = None
+    response_time_hours: Optional[int] = None
 
 
 class AttorneyLoginRequest(BaseModel):
@@ -616,6 +626,11 @@ class AttorneyProfileResponse(BaseModel):
     credits: int = 0
     created_at: Optional[str] = None
     case_preferences: Optional[CasePreferences] = None
+    bio: Optional[str] = None
+    languages: Optional[list[str]] = None
+    free_consultation: bool = False
+    photo_url: Optional[str] = None
+    response_time_hours: Optional[int] = None
 
 
 class LeadSummary(BaseModel):
