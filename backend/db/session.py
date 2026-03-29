@@ -40,3 +40,21 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def migrate_attorney_profile_columns():
+    """Add new attorney profile columns if they don't exist (idempotent)."""
+    from sqlalchemy import text
+    alter_statements = [
+        "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS languages JSON",
+        "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS free_consultation BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS photo_url VARCHAR",
+        "ALTER TABLE attorneys_registered ADD COLUMN IF NOT EXISTS response_time_hours INTEGER",
+    ]
+    async with engine.begin() as conn:
+        for stmt in alter_statements:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists (SQLite doesn't support IF NOT EXISTS)

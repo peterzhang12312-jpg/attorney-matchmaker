@@ -108,9 +108,11 @@ async def lifespan(app: FastAPI):
         log.warning("frontend_dist_not_found", path=str(FRONTEND_DIST))
 
     # Initialize database tables (no-op if they already exist)
-    from db.session import init_db
+    from db.session import init_db, migrate_attorney_profile_columns
     await init_db()
     log.info("database_initialized")
+    await migrate_attorney_profile_columns()
+    log.info("attorney_profile_columns_migrated")
 
     # Column migration: add credits to attorneys_registered if it doesn't exist yet
     try:

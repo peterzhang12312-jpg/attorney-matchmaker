@@ -78,6 +78,11 @@ class AttorneyRegistered(Base):
     credits = Column(Integer, nullable=False, default=0, server_default="0")
     profile_embedding = Column(JSON, nullable=True)   # list[float] 768-dim Gemini embedding
     mcp_api_key_hash = Column(String, nullable=True)  # SHA-256 hash of MCP API key
+    bio = Column(Text, nullable=True)
+    languages = Column(JSON, nullable=True)           # list[str]
+    free_consultation = Column(Boolean, nullable=False, default=False, server_default="false")
+    photo_url = Column(String, nullable=True)
+    response_time_hours = Column(Integer, nullable=True)
     webhook_config = Column(JSON, nullable=True)  # {url, secret, enabled}
     case_preferences = Column(JSON, nullable=True)  # {practice_areas?, min_budget?, jurisdictions?}
     created_at = Column(DateTime(timezone=True), server_default=func.now())
