@@ -2,10 +2,7 @@
 Stripe billing service — pay-per-lead model.
 
 Lead prices by practice area (charged at reveal time):
-  PI / Immigration / Criminal Defense  -> $75
-  Employment / IP / Corporate          -> $50
-  Real Estate / Family / Bankruptcy    -> $35
-  Landlord-Tenant / Other              -> $25
+  All practice areas -> $20 flat
 """
 from __future__ import annotations
 
@@ -17,27 +14,27 @@ import structlog
 
 log = structlog.get_logger()
 
-# Lead price tiers in cents
+# Lead price tiers in cents — flat $20 across all practice areas
 _PRICE_TIERS: dict[str, int] = {
-    "personal_injury":       7500,
-    "immigration":           7500,
-    "criminal_defense":      7500,
-    "employment":            5000,
-    "employment_employee":   5000,
-    "intellectual_property": 5000,
-    "corporate":             5000,
-    "securities":            5000,
-    "real_estate":           3500,
-    "family_law":            3500,
-    "bankruptcy":            3500,
-    "estate_planning":       3500,
-    "landlord_tenant":       2500,
-    "civil_litigation":      2500,
-    "contract_dispute":      2500,
-    "tax":                   2500,
+    "personal_injury":       2000,
+    "immigration":           2000,
+    "criminal_defense":      2000,
+    "employment":            2000,
+    "employment_employee":   2000,
+    "intellectual_property": 2000,
+    "corporate":             2000,
+    "securities":            2000,
+    "real_estate":           2000,
+    "family_law":            2000,
+    "bankruptcy":            2000,
+    "estate_planning":       2000,
+    "landlord_tenant":       2000,
+    "civil_litigation":      2000,
+    "contract_dispute":      2000,
+    "tax":                   2000,
 }
 
-_DEFAULT_PRICE = 2500  # $25 fallback
+_DEFAULT_PRICE = 2000  # $20 fallback
 
 
 def get_lead_price(practice_area: str) -> int:
@@ -127,9 +124,9 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 CREDIT_PACKAGES: list[dict] = [
-    {"id": "pack_2",  "credits": 2,  "amount_cents": 10000, "label": "Starter — 2 credits",  "per_credit": "$50"},
-    {"id": "pack_5",  "credits": 5,  "amount_cents": 20000, "label": "Value — 5 credits",     "per_credit": "$40"},
-    {"id": "pack_15", "credits": 15, "amount_cents": 50000, "label": "Pro — 15 credits",      "per_credit": "$33"},
+    {"id": "pack_3",  "credits": 3,  "amount_cents": 5000,  "label": "Starter — 3 credits",  "per_credit": "$16.67"},
+    {"id": "pack_8",  "credits": 8,  "amount_cents": 10000, "label": "Value — 8 credits",     "per_credit": "$12.50"},
+    {"id": "pack_20", "credits": 20, "amount_cents": 20000, "label": "Pro — 20 credits",      "per_credit": "$10.00"},
 ]
 
 _PACK_INDEX: dict[str, dict] = {p["id"]: p for p in CREDIT_PACKAGES}
