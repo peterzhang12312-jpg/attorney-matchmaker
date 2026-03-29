@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from db.session import get_db
+from db.models import AttorneyRegistered
 
 from data.attorneys import get_all_attorneys
 from models.schemas import AttorneyListResponse, Availability
@@ -79,3 +83,47 @@ async def list_attorneys(
         attorneys=attorneys,
         total=len(attorneys),
     )
+
+
+@router.get(
+    "/attorneys/{attorney_id}",
+    summary="Get a single attorney profile by ID",
+)
+async def get_attorney(
+    attorney_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    # 1. Check static list first (att-XXX IDs)
+    all_attorneys = get_all_attorneys()
+    static_match = next((a for a in all_attorneys if a.id == attorney_id), None)
+    if static_match:
+        data = static_match.model_dump()
+        data.pop("email", None)  # don't expose email publicly
+        return data
+
+    # 2. Fall back to registered attorneys table
+    result = await db.execute(
+        select(AttorneyRegistered).where(AttorneyRegistered.id == attorney_id)
+    )
+    reg = result.scalar_one_or_none()
+    if reg is None:
+        raise HTTPException(status_code=404, detail="Attorney not found")
+
+    return {
+        "id": reg.id,
+        "name": reg.name,
+        "bar_number": reg.bar_number,
+        "firm": reg.firm,
+        "jurisdictions": reg.jurisdictions or [],
+        "specializations": reg.practice_areas or [],
+        "years_experience": 0,
+        "win_rate": 0.0,
+        "availability": reg.availability or "available",
+        "notable_cases": [],
+        "hourly_rate": int(reg.hourly_rate) if reg.hourly_rate else None,
+        "bio": reg.bio,
+        "languages": reg.languages or [],
+        "free_consultation": reg.free_consultation or False,
+        "photo_url": reg.photo_url,
+        "response_time_hours": reg.response_time_hours,
+    }
