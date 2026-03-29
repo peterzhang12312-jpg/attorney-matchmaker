@@ -14,6 +14,9 @@ async def test_get_attorney_by_static_id_returns_profile():
     assert "bio" in data
     assert "languages" in data
     assert "free_consultation" in data
+    assert "email" not in data
+    assert "photo_url" in data
+    assert "response_time_hours" in data
 
 
 @pytest.mark.asyncio
