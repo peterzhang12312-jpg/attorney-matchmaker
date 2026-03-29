@@ -127,6 +127,11 @@ export interface Attorney {
   hourly_rate: number | null;
   email: string | null;
   docket_intelligence?: DocketIntelligence | null;
+  bio?: string | null;
+  languages?: string[];
+  free_consultation?: boolean;
+  photo_url?: string | null;
+  response_time_hours?: number | null;
 }
 
 export interface ScoreBreakdown {
